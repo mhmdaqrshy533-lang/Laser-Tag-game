@@ -26,7 +26,8 @@ import {
   Sliders, 
   Wifi, 
   RotateCcw, 
-  Activity 
+  Activity,
+  Maximize
 } from 'lucide-react';
 
 // Compass tape parameters
@@ -787,6 +788,30 @@ function HUD() {
   );
 }
 
+function FullscreenToggle() {
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+
+  return (
+    <button 
+      onClick={toggleFullscreen}
+      className="fixed top-4 right-4 z-[100] p-2 bg-black/40 hover:bg-black/60 border border-white/20 rounded-lg text-white backdrop-blur-md transition-all active:scale-90"
+      title="Toggle Fullscreen"
+    >
+      <Maximize className="w-5 h-5" />
+    </button>
+  );
+}
+
 export default function App() {
   const gameState = useGameStore(state => state.gameState);
   const currentScreen = useGameStore(state => state.currentScreen);
@@ -820,6 +845,7 @@ export default function App() {
       onPointerDown={handleInteraction}
       className="w-screen h-screen bg-[#090d16] relative overflow-hidden font-sans select-none text-white force-landscape-container"
     >
+      <FullscreenToggle />
 
       {showSplash ? (
         <div className="absolute inset-0 z-50 bg-[#090d16] flex flex-col items-center justify-center pointer-events-auto">

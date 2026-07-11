@@ -7,15 +7,14 @@
 }
 
 @media (max-width: 1023px) and (orientation: portrait) {
-  /* When the user holds the mobile phone vertically, rotate the container 90 degrees to force landscape */
+  /* Force landscape by rotating the entire app container and centering it correctly */
   .force-landscape-container {
     width: 100vh !important;
     height: 100vw !important;
-    position: absolute !important;
-    top: 0 !important;
-    left: 100vw !important;
-    transform: rotate(90deg) !important;
-    transform-origin: top left !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) rotate(90deg) !important;
     overflow: hidden !important;
   }
 }
@@ -57,14 +56,17 @@
   }
 }
 
-/* Force canvas container and canvas element to fill the full layout screen area */
-#game-canvas-container,
-#game-canvas-container > div,
-#game-canvas-container canvas {
+/* Ensure the canvas container fills its parent without any gaps */
+#game-canvas-container {
   width: 100% !important;
   height: 100% !important;
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
+  background: #000;
+}
+
+#game-canvas-container canvas {
+  display: block;
 }
 
