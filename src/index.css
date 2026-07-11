@@ -57,3 +57,14 @@
   }
 }
 
+/* Force canvas container and canvas element to fill the full layout screen area */
+#game-canvas-container,
+#game-canvas-container > div,
+#game-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+

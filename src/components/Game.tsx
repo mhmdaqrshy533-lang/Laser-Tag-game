@@ -218,6 +218,69 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
   return null;
 }
 
+// Custom R3F state override component to force WebGL drawing buffer and camera
+// to landscape aspect ratio when the container is rotated by 90 degrees CSS
+function CanvasSizeOverride() {
+  const set = useThree((state: any) => state.set);
+  const gl = useThree((state: any) => state.gl);
+  const camera = useThree((state: any) => state.camera);
+
+  const performOverride = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const targetWidth = isPortrait ? window.innerHeight : window.innerWidth;
+    const targetHeight = isPortrait ? window.innerWidth : window.innerHeight;
+
+    set({
+      size: {
+        width: targetWidth,
+        height: targetHeight,
+        top: 0,
+        left: 0,
+      }
+    });
+    gl.setSize(targetWidth, targetHeight);
+    if ((camera as any).isPerspectiveCamera) {
+      const cam = camera as any;
+      cam.aspect = targetWidth / targetHeight;
+      cam.updateProjectionMatrix();
+    }
+  }, [set, gl, camera]);
+
+  // Run immediately on mount and window resize
+  useEffect(() => {
+    performOverride();
+    window.addEventListener('resize', performOverride);
+    return () => window.removeEventListener('resize', performOverride);
+  }, [performOverride]);
+
+  // Also safeguard inside useFrame to continuously override any automated R3F ResizeObserver changes
+  useFrame((state) => {
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const targetWidth = isPortrait ? window.innerHeight : window.innerWidth;
+    const targetHeight = isPortrait ? window.innerWidth : window.innerHeight;
+
+    if (state.size.width !== targetWidth || state.size.height !== targetHeight) {
+      set({
+        size: {
+          width: targetWidth,
+          height: targetHeight,
+          top: 0,
+          left: 0,
+        }
+      });
+      state.gl.setSize(targetWidth, targetHeight);
+      if ((state.camera as any).isPerspectiveCamera) {
+        const cam = state.camera as any;
+        cam.aspect = targetWidth / targetHeight;
+        cam.updateProjectionMatrix();
+      }
+    }
+  });
+
+  return null;
+}
+
 // ==========================================
 // 3D GAME VIEWPORT CONTAINER
 // ==========================================
@@ -393,6 +456,9 @@ export function Game() {
             failIfMajorPerformanceCaveat: false
           }}
         >
+          {/* Dynamic canvas drawing buffer size and aspect ratio correction */}
+          <CanvasSizeOverride />
+
           {/* Context Loss Guardian */}
           <WebGLContextListener onContextLost={handleCanvasReset} />
 
