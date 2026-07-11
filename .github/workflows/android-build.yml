@@ -33,17 +33,18 @@ jobs:
           distribution: 'zulu'
           java-version: '21'
 
+      # تحسين: التعديل هنا لضمان تثبيت أدوات البناء تلقائياً وبأحدث نسخة
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          build-tools-version: '34.0.0'
+          sdk-version: '34'
 
-      - name: Initialize and Sync Capacitor (Android Wrapper)
+      - name: Initialize and Sync Capacitor
         run: |
-          # Add android platform folder if it doesn't exist
           if [ ! -d "android" ]; then
             npx cap add android
           fi
-          
-          # Sync Web Assets into Native Android folder
           npx cap sync android
 
       - name: Build Android Release APK with Gradle
@@ -61,20 +62,14 @@ jobs:
           alias: ${{ secrets.ALIAS }}
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
-        continue-on-error: true # Keep compiled apk if signing secrets are not configured yet
+        # إزالة continue-on-error هنا إذا كنت تريد أن يفشل البناء عند عدم وجود مفاتيح التوقيع
+        # للحفاظ على الانضباط الأمني في عملك.
 
       - name: Rename and Prepare Build Artifacts
         run: |
           mkdir -p build-outputs
-          # Copy signed apk if it was created successfully
-          if [ -f "android/app/build/outputs/apk/release/app-release-unsigned-signed.apk" ]; then
-            cp android/app/build/outputs/apk/release/app-release-unsigned-signed.apk build-outputs/ShadowForce-Release-Signed.apk
-          elif [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
-            cp android/app/build/outputs/apk/release/app-release.apk build-outputs/ShadowForce-Release.apk
-          else
-            # Fallback to general compiled APK outputs
-            find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} build-outputs/ \;
-          fi
+          # تحسين مسار النسخ للتعامل مع المخرجات الموقعة وغير الموقعة
+          cp android/app/build/outputs/apk/release/*.apk build-outputs/ || true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
