@@ -12,9 +12,12 @@ export type EntityState = 'active' | 'disabled';
 
 export interface EnemyData {
   id: string;
+  type?: 'soldier' | 'boss' | 'drone';
   position: [number, number, number];
   state: EntityState;
   disabledUntil: number;
+  health?: number;
+  maxHealth?: number;
 }
 
 export interface PlayerData {
@@ -55,9 +58,10 @@ interface GameStore {
   timeLeft: number;
   playerState: EntityState;
   playerDisabledUntil: number;
+  timeScale: number;
+  abilityEnergy: number;
+  isTimeDilationActive: boolean;
   enemies: EnemyData[];
-  lasers: LaserData[];
-  particles: ParticleData[];
   events: GameEvent[];
   
   // Multiplayer
@@ -67,10 +71,16 @@ interface GameStore {
   playerLevel: number;
   xp: number;
   selectedStage: 'residential' | 'desert' | 'alien';
+  activeDialogue: string | null;
+  bossShieldActive: boolean;
+  shieldGenerators: { id: string; health: number; position: [number, number, number] }[];
   saveProgress: () => void;
   loadProgress: () => void;
   setSelectedStage: (stage: 'residential' | 'desert' | 'alien') => void;
   setPlayerLevel: (level: number) => void;
+  setActiveDialogue: (text: string | null) => void;
+  setBossShield: (active: boolean) => void;
+  damageGenerator: (id: string, damage: number) => void;
 
   // Arabic UI Cyber Sovereign States
   currentScreen: 'lobby' | 'hangar' | 'campaign' | 'missions' | 'about';
@@ -109,12 +119,11 @@ interface GameStore {
   updateTime: (delta: number) => void;
   hitPlayer: () => void;
   hitEnemy: (id: string, byPlayer?: boolean) => void;
-  addLaser: (start: [number, number, number], end: [number, number, number], color: string) => void;
-  addParticles: (position: [number, number, number], color: string) => void;
   addEvent: (message: string) => void;
   updateEnemies: (time: number) => void;
-  cleanupEffects: (time: number) => void;
   setPlayerState: (state: EntityState) => void;
+  toggleTimeDilation: (active: boolean) => void;
+  updateAbilityEnergy: (delta: number) => void;
   
   // Multiplayer actions
   updatePlayerPosition: (position: [number, number, number], rotation: [number, number, number]) => void;
@@ -148,14 +157,11 @@ interface GameStore {
 }
 
 const INITIAL_ENEMIES: EnemyData[] = [
-  { id: 'bot-1', position: [40, 1, 40], state: 'active', disabledUntil: 0 },
-  { id: 'bot-2', position: [-40, 1, 40], state: 'active', disabledUntil: 0 },
-  { id: 'bot-3', position: [40, 1, -40], state: 'active', disabledUntil: 0 },
-  { id: 'bot-4', position: [-40, 1, -40], state: 'active', disabledUntil: 0 },
-  { id: 'bot-5', position: [0, 1, -50], state: 'active', disabledUntil: 0 },
-  { id: 'bot-6', position: [60, 1, 0], state: 'active', disabledUntil: 0 },
-  { id: 'bot-7', position: [-60, 1, 0], state: 'active', disabledUntil: 0 },
-  { id: 'bot-8', position: [0, 1, 50], state: 'active', disabledUntil: 0 },
+  { id: 'bot-1', type: 'soldier', position: [40, 1, 40], state: 'active', disabledUntil: 0, health: 100, maxHealth: 100 },
+  { id: 'bot-2', type: 'soldier', position: [-40, 1, 40], state: 'active', disabledUntil: 0, health: 100, maxHealth: 100 },
+  { id: 'bot-3', type: 'soldier', position: [40, 1, -40], state: 'active', disabledUntil: 0, health: 100, maxHealth: 100 },
+  { id: 'bot-4', type: 'soldier', position: [-40, 1, -40], state: 'active', disabledUntil: 0, health: 100, maxHealth: 100 },
+  { id: 'boss-1', type: 'boss', position: [0, 1, -200], state: 'active', disabledUntil: 0, health: 2000, maxHealth: 2000 },
 ];
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -168,8 +174,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   altitude: 100,
   setPlaneStats: (speed, altitude) => set({ speed, altitude }),
   enemies: [],
-  lasers: [],
-  particles: [],
+  timeScale: 1.0,
+  abilityEnergy: 100,
+  isTimeDilationActive: false,
   events: [],
   
   socket: null,
@@ -178,8 +185,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
   playerLevel: 1,
   xp: 0,
   selectedStage: 'residential',
+  activeDialogue: null,
+  bossShieldActive: true,
+  shieldGenerators: [
+    { id: 'gen-1', health: 100, position: [15, 0, -210] },
+    { id: 'gen-2', health: 100, position: [-15, 0, -210] },
+  ],
   setSelectedStage: (stage) => set({ selectedStage: stage }),
   setPlayerLevel: (playerLevel) => set({ playerLevel }),
+  setActiveDialogue: (activeDialogue) => set({ activeDialogue }),
+  setBossShield: (bossShieldActive) => set({ bossShieldActive }),
+  damageGenerator: (id, damage) => set((state) => {
+    const generators = state.shieldGenerators.map(g => {
+      if (g.id === id) {
+        const newHealth = Math.max(0, g.health - damage);
+        return { ...g, health: newHealth };
+      }
+      return g;
+    });
+    const anyAlive = generators.some(g => g.health > 0);
+    return { shieldGenerators: generators, bossShieldActive: anyAlive };
+  }),
 
   // Arabic UI Cyber Sovereign initial states
   currentScreen: 'lobby',
@@ -289,7 +315,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
         gameState: 'playing',
         timeLeft: 120,
         score: 0,
-        enemies: INITIAL_ENEMIES.map(e => ({ ...e, state: 'active', disabledUntil: 0 }))
+        enemies: INITIAL_ENEMIES.map(e => ({ ...e, state: 'active', disabledUntil: 0 })),
+        bossShieldActive: true,
+        shieldGenerators: [
+          { id: 'gen-1', health: 100, position: [15, 0, -210] },
+          { id: 'gen-2', health: 100, position: [-15, 0, -210] },
+        ]
       });
     });
 
@@ -317,10 +348,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       });
 
       newSocket.on('playerShot', (data: { id: string, start: [number, number, number], end: [number, number, number], color: string }) => {
-        set(state => ({
-          lasers: [...state.lasers, { id: Math.random().toString(36).substr(2, 9), start: data.start, end: data.end, timestamp: Date.now(), color: data.color }],
-          particles: [...state.particles, { id: Math.random().toString(36).substr(2, 9), position: data.end, timestamp: Date.now(), color: data.color }]
-        }));
+        const win = window as any;
+        if (win.addLaser) win.addLaser(data.start, data.end, data.color);
+        if (win.addParticles) win.addParticles(data.end, data.color);
       });
 
       newSocket.on('playerHit', (data: { targetId: string, shooterId: string, targetDisabledUntil: number, shooterScore: number }) => {
@@ -394,8 +424,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       playerState: 'active',
       playerDisabledUntil: 0,
       enemies: INITIAL_ENEMIES.map(e => ({ ...e, state: 'active', disabledUntil: 0 })),
-      lasers: [],
-      particles: [],
+      bossShieldActive: true,
+      shieldGenerators: [
+        { id: 'gen-1', health: 100, position: [15, 0, -210] },
+        { id: 'gen-2', health: 100, position: [-15, 0, -210] },
+      ],
       events: [],
       socket: newSocket,
       otherPlayers: {},
@@ -426,8 +459,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       socket: null,
       otherPlayers: {},
       enemies: [],
-      lasers: [],
-      particles: [],
       events: [],
       score: 0,
       timeLeft: 120,
@@ -487,8 +518,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       return state;
     }
 
+    let bossKilled = false;
     const enemies = state.enemies.map(e => {
       if (e.id === id && e.state === 'active') {
+        if (e.type === 'boss') {
+          if (state.bossShieldActive) {
+            // Prevent damage if shield is up
+            return e;
+          }
+          const newHealth = Math.max(0, (e.health || 0) - 50);
+          if (newHealth <= 0) {
+            bossKilled = true;
+            return { ...e, state: 'disabled' as EntityState, disabledUntil: Date.now() + 100000, health: 0 };
+          }
+          return { ...e, health: newHealth };
+        }
         return { ...e, state: 'disabled' as EntityState, disabledUntil: Date.now() + 3000 };
       }
       return e;
@@ -500,17 +544,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let newEvents = state.events;
 
     if (byPlayer) {
-      newScore += 100;
-      newXp += 25; // Gain XP
+      newScore += bossKilled ? 5000 : 100;
+      newXp += bossKilled ? 1000 : 25; 
+      
       const xpNeeded = newLevel * 100;
       if (newXp >= xpNeeded) {
         newXp -= xpNeeded;
         newLevel += 1;
         newEvents = [...newEvents, { id: Math.random().toString(), message: `LEVEL UP! You are now level ${newLevel}`, timestamp: Date.now() }];
       } else {
-        newEvents = [...newEvents, { id: Math.random().toString(), message: `You tagged ${id}`, timestamp: Date.now() }];
+        newEvents = [...newEvents, { id: Math.random().toString(), message: `Tagged target: ${id}`, timestamp: Date.now() }];
       }
-      // Schedule save progress (using macro task to avoid blocking main thread on frame)
       setTimeout(() => get().saveProgress(), 0);
     }
 
@@ -522,20 +566,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       events: newEvents
     };
   }),
-
-  addLaser: (start, end, color) => {
-    const { socket } = get();
-    if (socket) {
-      socket.emit('shoot', { start, end, color });
-    }
-    set((state) => ({
-      lasers: [...state.lasers, { id: Math.random().toString(36).substr(2, 9), start, end, timestamp: Date.now(), color }]
-    }));
-  },
-
-  addParticles: (position, color) => set((state) => ({
-    particles: [...state.particles, { id: Math.random().toString(36).substr(2, 9), position, timestamp: Date.now(), color }]
-  })),
 
   addEvent: (message) => set((state) => ({
     events: [...state.events, { id: Math.random().toString(), message, timestamp: Date.now() }]
@@ -578,17 +608,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     return changed || playersChanged ? { enemies, otherPlayers } : state;
   }),
 
-  cleanupEffects: (time) => set((state) => {
-    const lasers = state.lasers.filter(l => time - l.timestamp < 200); // Lasers last 200ms
-    const particles = state.particles.filter(p => time - p.timestamp < 500); // Particles last 500ms
-    const events = state.events.filter(e => time - e.timestamp < 5000); // Events last 5s
-    if (lasers.length !== state.lasers.length || particles.length !== state.particles.length || events.length !== state.events.length) {
-      return { lasers, particles, events };
-    }
-    return state;
+  setPlayerState: (playerState) => set({ playerState }),
+
+  toggleTimeDilation: (active) => set((state) => {
+    if (active && state.abilityEnergy < 20) return state;
+    return { 
+      isTimeDilationActive: active,
+      timeScale: active ? 0.2 : 1.0 
+    };
   }),
 
-  setPlayerState: (playerState) => set({ playerState }),
+  updateAbilityEnergy: (delta) => set((state) => {
+    let energy = state.abilityEnergy;
+    if (state.isTimeDilationActive) {
+      energy = Math.max(0, energy - delta * 25);
+      if (energy <= 0) {
+        return { abilityEnergy: 0, isTimeDilationActive: false, timeScale: 1.0 };
+      }
+    } else {
+      energy = Math.min(100, energy + delta * 10);
+    }
+    return { abilityEnergy: energy };
+  }),
 
   updatePlayerPosition: (position, rotation) => {
     const { socket } = get();

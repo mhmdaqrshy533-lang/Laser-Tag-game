@@ -22,9 +22,14 @@ import {
   ArenaVisual, 
   PlayerVisual, 
   EnemyVisual, 
-  OtherPlayerVisual 
+  OtherPlayerVisual,
+  CinematicOverlay,
+  Lasers,
+  ImpactParticles,
+  ShieldGeneratorVisual,
+  ChronosEffect,
+  DesertVisual
 } from './VisualEngine';
-import { Effects } from './Effects';
 import * as THREE from 'three';
 
 // Detect mobile clients for DPR scaling
@@ -67,13 +72,10 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
   // Actions
   const hitPlayer = useGameStore(state => state.hitPlayer);
   const hitEnemy = useGameStore(state => state.hitEnemy);
-  const addLaser = useGameStore(state => state.addLaser);
-  const addParticles = useGameStore(state => state.addParticles);
 
   // Timers
   const updateTime = useGameStore(state => state.updateTime);
   const updateEnemies = useGameStore(state => state.updateEnemies);
-  const cleanupEffects = useGameStore(state => state.cleanupEffects);
 
   // Inputs Ref
   const keys = useRef({ w: false, a: false, s: false, d: false, ' ': false });
@@ -185,20 +187,26 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
     const now = Date.now();
     updateTime(delta);
     updateEnemies(now);
-    cleanupEffects(now);
 
     // Fixed timestep update loops
     accumulator.current += delta;
     if (accumulator.current > 0.2) accumulator.current = 0.2; // Cap lag spikes
 
+    const store = useGameStore.getState();
+    const physState = stateRef.current as any;
+    physState.timeScale = store.timeScale;
+    physState.isTimeDilationActive = store.isTimeDilationActive;
+    physState.abilityEnergy = store.abilityEnergy;
+    physState.selectedStage = store.selectedStage;
+
     while (accumulator.current >= TIMESTEP) {
       simulateFixedStep(
-        stateRef.current,
-        keys.current,
+        physState,
+        keys.current as any,
         {
-          move: useGameStore.getState().mobileInput.move,
-          look: useGameStore.getState().mobileInput.look,
-          shooting: useGameStore.getState().mobileInput.shooting
+          move: store.mobileInput.move,
+          look: store.mobileInput.look,
+          shooting: store.mobileInput.shooting
         },
         TIMESTEP,
         playerLevel,
@@ -207,8 +215,11 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
         {
           hitPlayer,
           hitEnemy,
-          addLaser,
-          addParticles
+          addLaser: (window as any).addLaser,
+          addParticles: (window as any).addParticles,
+          toggleTimeDilation: (active) => useGameStore.getState().toggleTimeDilation(active),
+          updateAbilityEnergy: (dt) => useGameStore.getState().updateAbilityEnergy(dt),
+          setPlaneStats: store.setPlaneStats
         }
       );
       accumulator.current -= TIMESTEP;
@@ -224,6 +235,7 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
 
 export function Game() {
   const enemies = useGameStore(state => state.enemies);
+  const shieldGenerators = useGameStore(state => state.shieldGenerators);
   const otherPlayerIds = useGameStore(
     useShallow(state => Object.keys(state.otherPlayers))
   );
@@ -260,9 +272,8 @@ export function Game() {
   }, []);
 
   // Raycaster Firing Action Hook
-  const addLaser = useGameStore(state => state.addLaser);
-  const addParticles = useGameStore(state => state.addParticles);
   const hitEnemy = useGameStore(state => state.hitEnemy);
+  const damageGenerator = useGameStore(state => state.damageGenerator);
 
   useEffect(() => {
     shootRef.current = () => {
@@ -281,12 +292,12 @@ export function Game() {
       player.ammo -= 1;
       useGameStore.getState().setAmmo(player.ammo);
 
-      // Firing screen shake/recoil
+      // Recoil
       player.pitch = Math.min(0.6, player.pitch + 0.015);
       player.recoilOffset = 0.08;
       setTimeout(() => { player.recoilOffset = 0; }, 60);
 
-      // Trigger muzzle flash
+      // Muzzle Flash
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, player.yaw, 0));
       const barrelOffset = new THREE.Vector3(0.5, 0.9, -1.3).applyQuaternion(q);
       const flashPos = player.position.clone().add(barrelOffset);
@@ -294,38 +305,53 @@ export function Game() {
       player.showMuzzleFlash = true;
       setTimeout(() => { player.showMuzzleFlash = false; }, 45);
 
-      // Calculate camera coordinates
-      const camDir = new THREE.Vector3(0, 0, -1);
-      
-      // We grab camera look rotation from window context easily
-      const glCanvas = document.querySelector('canvas');
-      if (glCanvas) {
-        // Approximate standard look direction
-        camDir.set(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
-      }
-
+      // Raycast
+      const camDir = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
       const cameraHeight = player.stance === 'prone' ? 0.35 : (player.stance === 'crouch' ? 0.9 : 1.6);
-      const barrelHeight = player.stance === 'prone' ? 0.2 : (player.stance === 'crouch' ? 0.65 : 1.2);
-
       const rayStart = player.position.clone().add(new THREE.Vector3(0, cameraHeight, 0));
       const barrelOrigin = player.position.clone().add(
-        new THREE.Vector3(0.4, barrelHeight, -1.2).applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, player.yaw, 0)))
+        new THREE.Vector3(0.4, player.stance === 'prone' ? 0.2 : (player.stance === 'crouch' ? 0.65 : 1.2), -1.2)
+          .applyQuaternion(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, player.yaw, 0)))
       );
 
-      // Fast vector cylinder check for bullet pathing
+      // Check Shield Generators first
+      let closestGenId: string | null = null;
+      let closestGenDist = Infinity;
+      useGameStore.getState().shieldGenerators.forEach(gen => {
+        if (gen.health <= 0) return;
+        const genPos = new THREE.Vector3(...gen.position).add(new THREE.Vector3(0, 3, 0));
+        const toGen = genPos.clone().sub(rayStart);
+        const projection = toGen.dot(camDir);
+        if (projection < 0) return;
+        const closestPointOnRay = rayStart.clone().addScaledVector(camDir, projection);
+        const dist = closestPointOnRay.distanceTo(genPos);
+        if (dist < 3.0 && projection < closestGenDist) {
+          closestGenId = gen.id;
+          closestGenDist = projection;
+        }
+      });
+
+      const win = window as any;
+      if (closestGenId) {
+        damageGenerator(closestGenId, 25);
+        const gen = useGameStore.getState().shieldGenerators.find(g => g.id === closestGenId);
+        if (gen) {
+          const hitPos = new THREE.Vector3(...gen.position).add(new THREE.Vector3(0, 3, 0));
+          if (win.addParticles) win.addParticles([hitPos.x, hitPos.y, hitPos.z], '#3b82f6');
+          if (win.addLaser) win.addLaser([barrelOrigin.x, barrelOrigin.y, barrelOrigin.z], [hitPos.x, hitPos.y, hitPos.z], '#f59e0b');
+        }
+        return;
+      }
+
       let closestEnemyId: string | null = null;
       let closestDist = Infinity;
-      const enemyRadius = 1.8;
-
       Object.values(stateRef.current.enemies).forEach(enemy => {
-        const toEnemy = enemy.position.clone().add(new THREE.Vector3(0, cameraHeight, 0)).sub(rayStart);
+        const toEnemy = enemy.position.clone().add(new THREE.Vector3(0, 1.5, 0)).sub(rayStart);
         const projection = toEnemy.dot(camDir);
-        if (projection < 0) return; // behind us
-
+        if (projection < 0) return;
         const closestPointOnRay = rayStart.clone().addScaledVector(camDir, projection);
-        const distToEnemy = closestPointOnRay.distanceTo(enemy.position.clone().add(new THREE.Vector3(0, cameraHeight, 0)));
-        
-        if (distToEnemy < enemyRadius && projection < closestDist) {
+        const dist = closestPointOnRay.distanceTo(enemy.position.clone().add(new THREE.Vector3(0, 1.5, 0)));
+        if (dist < 1.8 && projection < closestDist) {
           closestEnemyId = enemy.id;
           closestDist = projection;
         }
@@ -333,21 +359,16 @@ export function Game() {
 
       if (closestEnemyId) {
         const bot = stateRef.current.enemies[closestEnemyId];
-        bot.state = 'disabled';
-        bot.disabledUntil = Date.now() + 5000; // Stun for 5 seconds
-        
         hitEnemy(closestEnemyId, true);
-        
-        const hitPoint = bot.position.clone().add(new THREE.Vector3(0, cameraHeight, 0));
-        addParticles([hitPoint.x, hitPoint.y, hitPoint.z], '#22c55e'); // Green blood splatter
-        addLaser([barrelOrigin.x, barrelOrigin.y, barrelOrigin.z], [hitPoint.x, hitPoint.y, hitPoint.z], '#f59e0b');
+        const hitPoint = bot.position.clone().add(new THREE.Vector3(0, 1.5, 0));
+        if (win.addParticles) win.addParticles([hitPoint.x, hitPoint.y, hitPoint.z], '#22c55e');
+        if (win.addLaser) win.addLaser([barrelOrigin.x, barrelOrigin.y, barrelOrigin.z], [hitPoint.x, hitPoint.y, hitPoint.z], '#f59e0b');
       } else {
-        // Draw standard range shot
-        const missEnd = rayStart.clone().addScaledVector(camDir, 1000);
-        addLaser([barrelOrigin.x, barrelOrigin.y, barrelOrigin.z], [missEnd.x, missEnd.y, missEnd.z], '#f59e0b');
+        const missEnd = rayStart.clone().addScaledVector(camDir, 500);
+        if (win.addLaser) win.addLaser([barrelOrigin.x, barrelOrigin.y, barrelOrigin.z], [missEnd.x, missEnd.y, missEnd.z], '#f59e0b');
       }
     };
-  }, [hitEnemy, addParticles, addLaser]);
+  }, [hitEnemy, damageGenerator]);
 
   const handleCanvasReset = () => {
     // Increment Canvas key to re-mount fully fresh and clear context leaks
@@ -356,6 +377,7 @@ export function Game() {
 
   return (
     <div className="w-full h-full relative" id="game-canvas-container">
+      <CinematicOverlay />
       <WebGLBoundary onReset={handleCanvasReset}>
         <AnyCanvas 
           key={canvasKey}
@@ -392,20 +414,31 @@ export function Game() {
           />
 
           {/* Optimized environment meshes */}
-          <ArenaVisual />
+          {useGameStore.getState().selectedStage === 'desert' ? (
+            <DesertVisual />
+          ) : (
+            <ArenaVisual />
+          )}
+          <Lasers />
+          <ImpactParticles />
 
           {/* High speed visual mesh hooks */}
           <PlayerVisual stateRef={stateRef} />
 
-          {enemies.map(enemy => (
+          {enemies?.map(enemy => (
             <EnemyVisual key={enemy.id} stateRef={stateRef} botId={enemy.id} />
           ))}
 
-          {otherPlayerIds.map(id => (
-            <OtherPlayerVisual key={id} id={id} />
+          {shieldGenerators?.map(gen => (
+            <ShieldGeneratorVisual key={gen.id} id={gen.id} />
           ))}
 
-          <Effects />
+          {otherPlayerIds?.map(id => (
+            <OtherPlayerVisual key={id} id={id} />
+          ))}
+          
+          <ChronosEffect />
+
 
           {/* Highly optimized tactical Bloom shader */}
           {!isMobile && (

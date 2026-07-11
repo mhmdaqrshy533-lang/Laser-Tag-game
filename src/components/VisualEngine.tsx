@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { SharedGameState, createInitialSharedState } from './PhysicsEngine';
 import { useGameStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
+import { cinematicEngine } from './CinematicEngine';
 
 // ==========================================
 // 1. WEBGL ERROR BOUNDARY & CANVAS PROTECTION
@@ -238,6 +239,143 @@ export function VolumetricCloud({ position }: { position: [number, number, numbe
         <meshStandardMaterial color="#ffffff" transparent opacity={0.4} roughness={0.9} />
       </mesh>
     </group>
+  );
+}
+
+// ==========================================
+// 8. BOSS MECH VISUALIZER
+// ==========================================
+
+export function BossVisual({ stateRef, bossId }: { stateRef: React.MutableRefObject<SharedGameState>; bossId: string }) {
+  const meshRef = useRef<THREE.Group>(null);
+  const headRef = useRef<THREE.Group>(null);
+  const reactorRef = useRef<THREE.Mesh>(null);
+  const shieldRef = useRef<THREE.Mesh>(null);
+  const leftLegRef = useRef<THREE.Group>(null);
+  const rightLegRef = useRef<THREE.Group>(null);
+
+  const shieldActive = useGameStore(state => state.bossShieldActive);
+
+  useFrame((state, delta) => {
+    const enemy = stateRef.current.enemies[bossId];
+    if (!enemy || !meshRef.current) return;
+
+    meshRef.current.position.copy(enemy.position);
+    meshRef.current.rotation.set(0, enemy.yaw, 0);
+
+    const time = state.clock.getElapsedTime();
+    const phase = enemy.userData.phase || 1;
+    
+    // Boss breathing / floating animation (intensifies with phase)
+    meshRef.current.position.y += Math.sin(time * (0.5 + phase * 0.2)) * (0.5 + phase * 0.1);
+
+    if (reactorRef.current) {
+      const mat = reactorRef.current.material as THREE.MeshStandardMaterial;
+      const color = phase === 3 ? '#ef4444' : phase === 2 ? '#f59e0b' : '#8b5cf6';
+      mat.color.set(color);
+      mat.opacity = 0.6 + Math.sin(time * 10) * 0.2;
+    }
+
+    if (shieldRef.current) {
+      const mat = shieldRef.current.material as THREE.MeshBasicMaterial;
+      shieldRef.current.visible = shieldActive;
+      if (shieldActive) {
+        shieldRef.current.rotation.y += delta * 0.5;
+        mat.opacity = 0.2 + Math.sin(time * 3) * 0.1;
+      }
+    }
+
+    if (enemy.isMoving) {
+      const angle = Math.sin(time * 4) * 0.4;
+      if (leftLegRef.current) leftLegRef.current.rotation.x = angle;
+      if (rightLegRef.current) rightLegRef.current.rotation.x = -angle;
+    }
+  });
+
+  return (
+    <group ref={meshRef}>
+      {/* Energy Shield Sphere */}
+      <mesh ref={shieldRef}>
+        <sphereGeometry args={[12, 32, 32]} />
+        <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} wireframe />
+      </mesh>
+
+      {/* Massive Mech Body */}
+      <mesh position={[0, 6, 0]} castShadow>
+        <boxGeometry args={[8, 10, 6]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.1} />
+      </mesh>
+      
+      {/* Reactor Core Glow */}
+      <mesh ref={reactorRef} position={[0, 6, 3.1]}>
+        <planeGeometry args={[4, 4]} />
+        <meshBasicMaterial color="#8b5cf6" transparent opacity={0.8} />
+      </mesh>
+      <pointLight position={[0, 6, 4]} color="#8b5cf6" intensity={5} distance={20} />
+
+      {/* Head Unit */}
+      <group ref={headRef} position={[0, 12, 1]}>
+        <mesh castShadow>
+          <boxGeometry args={[4, 3, 4]} />
+          <meshStandardMaterial color="#0f172a" metalness={0.8} />
+        </mesh>
+        <mesh position={[0, 0, 2.1]}>
+          <boxGeometry args={[3, 0.5, 0.1]} />
+          <meshBasicMaterial color="#ff0000" />
+        </mesh>
+      </group>
+
+      {/* Left Arm Cannon */}
+      <group position={[-6, 8, 2]}>
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[1.5, 1.5, 8]} />
+          <meshStandardMaterial color="#334155" />
+        </mesh>
+      </group>
+
+      {/* Right Arm Cannon */}
+      <group position={[6, 8, 2]}>
+        <mesh castShadow rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[1.5, 1.5, 8]} />
+          <meshStandardMaterial color="#334155" />
+        </mesh>
+      </group>
+
+      {/* Legs */}
+      <group ref={leftLegRef} position={[-3, 0, 0]}>
+        <mesh castShadow position={[0, 1.5, 0]}>
+          <boxGeometry args={[2, 6, 2]} />
+          <meshStandardMaterial color="#0f172a" />
+        </mesh>
+      </group>
+      <group ref={rightLegRef} position={[3, 0, 0]}>
+        <mesh castShadow position={[0, 1.5, 0]}>
+          <boxGeometry args={[2, 6, 2]} />
+          <meshStandardMaterial color="#0f172a" />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
+// ==========================================
+// 9. CINEMATIC OVERLAY & DIALOGUE (UI LAYER)
+// ==========================================
+
+export function CinematicOverlay() {
+  const dialogue = useGameStore(state => state.activeDialogue);
+
+  if (!dialogue) return null;
+
+  return (
+    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-full max-w-2xl px-8 z-50 pointer-events-none">
+      <div className="bg-black/80 backdrop-blur-xl border-l-4 border-amber-500 p-6 rounded-r-xl shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="text-amber-500 font-mono text-[10px] mb-2 tracking-[0.3em] uppercase opacity-80">نظام الاتصال الميداني: Alpha-6</div>
+        <div className="text-white text-lg font-medium leading-relaxed tracking-tight text-right dir-rtl">
+          {dialogue}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -883,7 +1021,7 @@ export function VisualSoldierMesh({ getPhysicsState, stance = 'stand', isMoving 
 }
 
 // ==========================================
-// 5. HIGH-FREQUENCY PLAYER RENDER LOOP
+// 11. HIGH-FREQUENCY PLAYER RENDER LOOP
 // ==========================================
 
 export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<SharedGameState> }) {
@@ -893,8 +1031,17 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
   const { camera } = useThree();
 
   // Sync coordinates inside useFrame, completely skipping re-renders of the general UI
-  useFrame(() => {
+  useFrame((state, delta) => {
     const player = stateRef.current.player;
+
+    // Update Cinematic Engine
+    cinematicEngine.update(delta, state.clock.getElapsedTime());
+
+    // Sync dialogue to store for UI overlay
+    const store = useGameStore.getState();
+    if (store.activeDialogue !== cinematicEngine.activeDialogue) {
+      store.setActiveDialogue(cinematicEngine.activeDialogue);
+    }
 
     if (meshRef.current) {
       // Direct positioning from 60Hz Physics Engine
@@ -915,34 +1062,85 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
       }
     }
 
+    // Handle Scripted Events from Physics Engine
+    if (stateRef.current.scriptedEvents.includes('boss_reveal')) {
+      stateRef.current.scriptedEvents = stateRef.current.scriptedEvents.filter(e => e !== 'boss_reveal');
+      stateRef.current.scriptedEvents.push('boss_reveal_active');
+      
+      // Add Cinematic Events
+      cinematicEngine.addEvent({
+        id: 'boss_cam_1',
+        type: 'camera_move',
+        startTime: state.clock.getElapsedTime(),
+        duration: 4,
+        params: { start: [0, 0, 0], end: [0, 10, -50] }
+      });
+      cinematicEngine.addEvent({
+        id: 'boss_shake_1',
+        type: 'shake',
+        startTime: state.clock.getElapsedTime(),
+        duration: 3,
+        params: { intensity: 1.5 }
+      });
+      cinematicEngine.addEvent({
+        id: 'boss_dialogue_1',
+        type: 'dialogue',
+        startTime: state.clock.getElapsedTime() + 0.5,
+        duration: 3,
+        params: { text: "تحذير: تم رصد طاقة هائلة تقترب من موقعك. استعد للمواجهة!" }
+      });
+    }
+
     // Dynamic Camera placement (First-Person vs Third-Person Orbit)
+    const shakeOffset = cinematicEngine.getShakeOffset();
+
     if (player.isFPP) {
-      const eyeHeight = player.stance === 'crouch' ? 0.3 : player.stance === 'prone' ? -0.8 : 1.45;
-      const eyePos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0));
-      camera.position.copy(eyePos);
-      camera.rotation.set(player.pitch, player.yaw + Math.PI, 0, 'YXZ');
+      if (stateRef.current.selectedStage === 'desert') {
+        const eyePos = player.position.clone();
+        // Camera is right at the front of the plane cockpit
+        eyePos.add(new THREE.Vector3(0, 0, 0).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'))).add(shakeOffset);
+        camera.position.copy(eyePos);
+        camera.rotation.set(player.pitch, player.yaw + Math.PI, 0, 'YXZ');
+      } else {
+        const eyeHeight = player.stance === 'crouch' ? 0.3 : player.stance === 'prone' ? -0.8 : 1.45;
+        const eyePos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0)).add(shakeOffset);
+        camera.position.copy(eyePos);
+        camera.rotation.set(player.pitch, player.yaw + Math.PI, 0, 'YXZ');
+      }
     } else {
       // Third Person Behind-Shoulder Camera with cinematic OTS Lerp
-      const eyeHeight = player.stance === 'crouch' ? 0.4 : player.stance === 'prone' ? -0.5 : 1.8;
-      const cameraOffset = new THREE.Vector3(
-        player.isAiming ? 0.65 : 0, 
-        eyeHeight, 
-        player.isAiming ? 2.1 : 4.5
-      );
-      // Kickback recoil offset
-      if (player.recoilOffset > 0) {
-        cameraOffset.y += player.recoilOffset * 0.5;
-        cameraOffset.z += player.recoilOffset;
-      }
+      if (stateRef.current.selectedStage === 'desert') {
+         const cameraOffset = new THREE.Vector3(0, 10, 30);
+         cameraOffset.applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'));
+         const targetCamPos = player.position.clone().add(cameraOffset).add(shakeOffset);
+         camera.position.lerp(targetCamPos, 0.25);
+         camera.lookAt(player.position);
+      } else {
+         const eyeHeight = player.stance === 'crouch' ? 0.4 : player.stance === 'prone' ? -0.5 : 1.8;
+         const cameraOffset = new THREE.Vector3(
+           player.isAiming ? 0.65 : 0, 
+           eyeHeight, 
+           player.isAiming ? 2.1 : 4.5
+         );
+         
+         // Apply Cinematic Offset
+         cameraOffset.add(cinematicEngine.cameraOffset);
 
-      cameraOffset.applyEuler(new THREE.Euler(0, player.yaw, 0));
-      const targetCamPos = player.position.clone().add(cameraOffset);
-      
-      camera.position.lerp(targetCamPos, 0.25);
-      
-      const lookOffset = player.stance === 'crouch' ? 0.5 : player.stance === 'prone' ? -0.4 : 1.2;
-      const lookTarget = player.position.clone().add(new THREE.Vector3(0, lookOffset, 0));
-      camera.lookAt(lookTarget);
+         // Kickback recoil offset
+         if (player.recoilOffset > 0) {
+           cameraOffset.y += player.recoilOffset * 0.5;
+           cameraOffset.z += player.recoilOffset;
+         }
+
+         cameraOffset.applyEuler(new THREE.Euler(0, player.yaw, 0));
+         const targetCamPos = player.position.clone().add(cameraOffset).add(shakeOffset);
+         
+         camera.position.lerp(targetCamPos, 0.25);
+         
+         const lookOffset = player.stance === 'crouch' ? 0.5 : player.stance === 'prone' ? -0.4 : 1.2;
+         const lookTarget = player.position.clone().add(new THREE.Vector3(0, lookOffset, 0));
+         camera.lookAt(lookTarget);
+      }
     }
   });
 
@@ -951,17 +1149,33 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
       {/* Soldier visual body - Hidden in FPP Mode for gameplay realism */}
       <group ref={meshRef}>
         <group ref={bodyGroupRef}>
-          <VisualSoldierMesh 
-            getPhysicsState={() => {
-              const p = stateRef.current.player;
-              return {
-                stance: p.stance,
-                isMoving: p.isMoving,
-                isAiming: p.isAiming
-              };
-            }}
-            color="#10b981" 
-          />
+          {useGameStore.getState().selectedStage === 'desert' ? (
+             <group>
+               {/* Stealth Plane Flying Wing design */}
+               <mesh castShadow rotation={[0, Math.PI, 0]}>
+                  {/* Flattened triangle/wing shape */}
+                  <coneGeometry args={[12, 18, 3, 1, false, 0, Math.PI]} />
+                  <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
+               </mesh>
+               {/* Cockpit canopy */}
+               <mesh position={[0, 1.5, 2]} rotation={[0, Math.PI, 0]}>
+                 <boxGeometry args={[3, 1, 6]} />
+                 <meshStandardMaterial color="#000000" metalness={1.0} roughness={0.0} />
+               </mesh>
+             </group>
+          ) : (
+            <VisualSoldierMesh 
+              getPhysicsState={() => {
+                const p = stateRef.current.player;
+                return {
+                  stance: p.stance,
+                  isMoving: p.isMoving,
+                  isAiming: p.isAiming
+                };
+              }}
+              color="#10b981" 
+            />
+          )}
         </group>
       </group>
 
@@ -978,7 +1192,7 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
 }
 
 // ==========================================
-// 6. HOSTILE BOTS VISUALIZER
+// 12. HOSTILE BOTS VISUALIZER
 // ==========================================
 
 export function EnemyVisual({ stateRef, botId }: { stateRef: React.MutableRefObject<SharedGameState>; botId: string }) {
@@ -999,6 +1213,11 @@ export function EnemyVisual({ stateRef, botId }: { stateRef: React.MutableRefObj
     if (activeGroupRef.current) activeGroupRef.current.visible = isActive;
     if (stunnedGroupRef.current) stunnedGroupRef.current.visible = !isActive;
   });
+
+  const enemy = stateRef.current.enemies[botId];
+  if (enemy?.type === 'boss') {
+    return <BossVisual stateRef={stateRef} bossId={botId} />;
+  }
 
   return (
     <group ref={meshRef}>
@@ -1063,6 +1282,233 @@ export function OtherPlayerVisual({ id }: { id: string }) {
         isAiming={false} 
         color={data.color || '#ec4899'} 
       />
+    </group>
+  );
+}
+
+// ==========================================
+// 13. POOLED IMPACT PARTICLES (INSTANCED)
+// ==========================================
+
+const MAX_PARTICLES = 1000;
+const dummyParticle = new THREE.Object3D();
+
+export function ImpactParticles() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const particles = useRef<any[]>([]);
+
+  useEffect(() => {
+    (window as any).addParticles = (pos: [number, number, number], color: string) => {
+      const count = 12;
+      for (let i = 0; i < count; i++) {
+        particles.current.push({
+          pos: new THREE.Vector3(...pos),
+          vel: new THREE.Vector3((Math.random() - 0.5) * 12, Math.random() * 12, (Math.random() - 0.5) * 12),
+          life: 1.0,
+          color: new THREE.Color(color)
+        });
+      }
+      if (particles.current.length > MAX_PARTICLES) {
+        particles.current.splice(0, particles.current.length - MAX_PARTICLES);
+      }
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      const p = particles.current[i];
+      if (p && p.life > 0) {
+        p.pos.addScaledVector(p.vel, delta);
+        p.vel.y -= 30 * delta;
+        p.life -= delta * 2.5;
+        dummyParticle.position.copy(p.pos);
+        dummyParticle.scale.setScalar(p.life * 0.3);
+        dummyParticle.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummyParticle.matrix);
+      } else {
+        dummyParticle.scale.setScalar(0);
+        dummyParticle.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummyParticle.matrix);
+      }
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[null as any, null as any, MAX_PARTICLES]}>
+      <boxGeometry args={[0.4, 0.4, 0.4]} />
+      <meshBasicMaterial transparent opacity={0.9} />
+    </instancedMesh>
+  );
+}
+
+// ==========================================
+// 14. POOLED LASER TRACERS (INSTANCED)
+// ==========================================
+
+const MAX_LASERS = 150;
+const dummyLaser = new THREE.Object3D();
+
+export function Lasers() {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const lasers = useRef<any[]>([]);
+
+  useEffect(() => {
+    (window as any).addLaser = (start: [number, number, number], end: [number, number, number], color: string) => {
+      const s = new THREE.Vector3(...start);
+      const e = new THREE.Vector3(...end);
+      const dir = new THREE.Vector3().subVectors(e, s);
+      lasers.current.push({
+        start: s,
+        end: e,
+        len: dir.length(),
+        life: 1.0,
+        color: new THREE.Color(color)
+      });
+      if (lasers.current.length > MAX_LASERS) {
+        lasers.current.shift();
+      }
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+    for (let i = 0; i < MAX_LASERS; i++) {
+      const l = lasers.current[i];
+      if (l && l.life > 0) {
+        l.life -= delta * 6.0;
+        const mid = new THREE.Vector3().addVectors(l.start, l.end).multiplyScalar(0.5);
+        dummyLaser.position.copy(mid);
+        dummyLaser.lookAt(l.end);
+        dummyLaser.scale.set(0.08 * l.life, 0.08 * l.life, l.len);
+        dummyLaser.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummyLaser.matrix);
+      } else {
+        dummyLaser.scale.setScalar(0);
+        dummyLaser.updateMatrix();
+        meshRef.current.setMatrixAt(i, dummyLaser.matrix);
+      }
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[null as any, null as any, MAX_LASERS]}>
+      <boxGeometry args={[1, 1, 1]} />
+      <meshBasicMaterial transparent opacity={1} />
+    </instancedMesh>
+  );
+}
+
+// ==========================================
+// 16. CHRONOS SHIFT EFFECT
+// ==========================================
+
+export function ChronosEffect() {
+  const isTimeDilationActive = useGameStore(state => state.isTimeDilationActive);
+  const { set } = useThree();
+  
+  useFrame((state) => {
+    // Dynamic color shift during time dilation
+    if (isTimeDilationActive) {
+      const t = state.clock.getElapsedTime();
+      const intensity = 0.5 + Math.sin(t * 8) * 0.1;
+      // We simulate a "blue shift" or "cold" effect
+      state.gl.setClearColor('#0a0f1a', 1);
+    } else {
+      state.gl.setClearColor('#020617', 1);
+    }
+  });
+
+  return (
+    <>
+      {isTimeDilationActive && (
+        <group>
+          <mesh scale={[100, 100, 100]}>
+            <sphereGeometry args={[1, 32, 32]} />
+            <meshBasicMaterial 
+              color="#3b82f6" 
+              side={THREE.BackSide} 
+              transparent 
+              opacity={0.05} 
+            />
+          </mesh>
+        </group>
+      )}
+    </>
+  );
+}
+
+export function ShieldGeneratorVisual({ id }: { id: string }) {
+  const meshRef = useRef<THREE.Group>(null);
+  const generator = useGameStore(state => state.shieldGenerators.find(g => g.id === id));
+  
+  useFrame((state, delta) => {
+    if (!meshRef.current || !generator) return;
+    const time = state.clock.getElapsedTime();
+    
+    if (generator.health > 0) {
+      meshRef.current.children[0].rotation.y += delta * 2;
+    } else {
+      meshRef.current.scale.setScalar(Math.max(0.2, meshRef.current.scale.x - delta * 0.5));
+      meshRef.current.position.y = Math.max(-2, meshRef.current.position.y - delta * 2);
+    }
+  });
+
+  if (!generator) return null;
+
+  return (
+    <group ref={meshRef} position={generator.position}>
+      {/* Rotating Core */}
+      <mesh position={[0, 3, 0]}>
+        <octahedronGeometry args={[2]} />
+        <meshStandardMaterial 
+          color={generator.health > 0 ? "#3b82f6" : "#475569"} 
+          emissive={generator.health > 0 ? "#3b82f6" : "#000000"}
+          emissiveIntensity={2}
+        />
+      </mesh>
+      
+      {/* Base */}
+      <mesh position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[3, 4, 1, 6]} />
+        <meshStandardMaterial color="#1e293b" />
+      </mesh>
+
+      {/* Beam to Boss (Conceptual) */}
+      {generator.health > 0 && (
+        <mesh position={[0, 50, 0]} rotation={[0, 0, 0]}>
+          <cylinderGeometry args={[0.2, 0.2, 100]} />
+          <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+export function DesertVisual() {
+  const { camera } = useThree();
+  const dunesRef = useRef<THREE.Mesh>(null);
+  
+  useMemo(() => {
+    // We can't easily displace vertices dynamically in the same way without a shader,
+    // so we'll just let it be a vast flat/bumpy plane for performance,
+    // or add a simple noise shader.
+  }, []);
+
+  return (
+    <group>
+      <Sky sunPosition={[500, 50, -1000]} turbidity={0.6} rayleigh={2} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      <ambientLight intensity={0.2} color="#fca5a5" />
+      <directionalLight position={[500, 50, -1000]} intensity={1.5} color="#fb923c" castShadow />
+      <fog attach="fog" args={['#d97706', 500, 5000]} />
+      
+      {/* Massive Desert Ground */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0,-100,0]}>
+        <planeGeometry args={[20000, 20000]} />
+        <meshStandardMaterial color="#92400e" roughness={0.9} metalness={0.1} />
+      </mesh>
     </group>
   );
 }

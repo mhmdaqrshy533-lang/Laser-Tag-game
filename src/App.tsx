@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { useGameStore } from './store';
 import CinematicIntro from './components/CinematicIntro';
@@ -66,7 +67,10 @@ function useIsMobile() {
   return isMobile;
 }
 
+import { StealthHUD } from './components/StealthHUD';
+
 function HUD() {
+  const selectedStage = useGameStore(state => state.selectedStage);
   const gameState = useGameStore(state => state.gameState);
   const score = useGameStore(state => state.score);
   const timeLeft = useGameStore(state => state.timeLeft);
@@ -88,6 +92,8 @@ function HUD() {
   const useMedkit = useGameStore(state => state.useMedkit);
   const useArmorKit = useGameStore(state => state.useArmorKit);
   const useEnergyDrink = useGameStore(state => state.useEnergyDrink);
+  const abilityEnergy = useGameStore(state => state.abilityEnergy);
+  const isTimeDilationActive = useGameStore(state => state.isTimeDilationActive);
 
   const [isMuted, setIsMuted] = useState(false);
   const [isMicOn, setIsMicOn] = useState(false);
@@ -315,6 +321,10 @@ function HUD() {
     animId = requestAnimationFrame(updateLoop);
     return () => cancelAnimationFrame(animId);
   }, []);
+
+  if (selectedStage === 'desert') {
+    return <StealthHUD />;
+  }
 
   return (
     <div className="absolute inset-0 pointer-events-none select-none font-sans">
@@ -693,6 +703,20 @@ function HUD() {
                <span className="text-[6px] text-slate-400 font-bold mt-0.5">VIEW</span>
             </button>
          </div>
+      </div>
+
+      {/* Chronos Shift Energy Bar */}
+      <div className="absolute bottom-20 right-72 pointer-events-auto z-40 flex flex-col items-end gap-1 select-none">
+        <div className="flex items-center gap-2">
+           <span className={`text-[8px] font-black tracking-[0.2em] ${isTimeDilationActive ? 'text-blue-400' : 'text-slate-400'}`}>CHRONOS SHIFT [SHIFT]</span>
+           <div className={`w-2 h-2 rounded-full ${isTimeDilationActive ? 'bg-blue-400 animate-ping' : abilityEnergy < 25 ? 'bg-red-500' : 'bg-blue-600'}`}></div>
+        </div>
+        <div className="w-48 h-1.5 bg-black/60 border border-white/5 rounded-full overflow-hidden backdrop-blur-sm">
+           <motion.div 
+             className={`h-full ${isTimeDilationActive ? 'bg-blue-400' : 'bg-blue-600'}`}
+             animate={{ width: `${abilityEnergy}%` }}
+           />
+        </div>
       </div>
 
       {/* Dynamic Weapon Box (Bottom Right Side) */}
