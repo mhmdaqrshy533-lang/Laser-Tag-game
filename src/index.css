@@ -1,1 +1,35 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&family=Space+Grotesk:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@media (max-width: 1023px) and (orientation: portrait) {
+  /* When the user holds the mobile phone vertically, rotate the container 90 degrees to force landscape */
+  .force-landscape-container {
+    width: 100vh !important;
+    height: 100vw !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 100vw !important;
+    transform: rotate(90deg) !important;
+    transform-origin: top left !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Custom glow animations for high-fidelity Battlegrounds feel */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(245, 158, 11, 0.4), inset 0 0 5px rgba(245, 158, 11, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.8), inset 0 0 10px rgba(245, 158, 11, 0.4);
+  }
+}
+
+.hud-fire-glow {
+  animation: pulse-glow 2s infinite ease-in-out;
+}

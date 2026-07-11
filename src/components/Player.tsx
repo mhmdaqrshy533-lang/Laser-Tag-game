@@ -8,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useRapier, RigidBody, RapierRigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import { useGameStore } from '../store';
+import { Html } from '@react-three/drei';
 
 // Beautiful procedural M416 Assault Rifle mesh
 function RifleVisual({ isAiming }: { isAiming: boolean }) {
@@ -296,7 +297,8 @@ export function Player() {
   const [stance, setStance] = useState<'stand' | 'crouch' | 'prone'>('stand');
   const [isAiming, setIsAiming] = useState(false);
   const [isFPP, setIsFPP] = useState(false);
-  const [ammo, setAmmo] = useState(30);
+  const ammo = useGameStore(state => state.ammo);
+  const setAmmo = useGameStore(state => state.setAmmo);
   const [isReloading, setIsReloading] = useState(false);
 
   // Recoil offset for weapon fire kickback
@@ -448,7 +450,7 @@ export function Player() {
     const now = Date.now();
     if (now - lastShootTime.current < 110) return; // M416 automatic firing rate: ~110ms
     lastShootTime.current = now;
-    setAmmo(prev => prev - 1);
+    setAmmo(ammo - 1);
 
     // Muzzle flash visual trigger
     if (planeGroupRef.current) {
@@ -516,8 +518,13 @@ export function Player() {
     const k = keys.current;
     const mobileInput = useGameStore.getState().mobileInput;
 
-    // Expose pointerYaw to window for high-performance fluid compass rendering
+    // Expose pointerYaw and playerPosition to window for high-performance fluid compass and bot AI rendering
     (window as any).playerYaw = pointerYaw.current;
+    (window as any).playerPosition = playerPosition.current;
+    (window as any).playerStance = stance;
+    (window as any).playerIsAiming = isAiming;
+    (window as any).playerIsFPP = isFPP;
+    (window as any).playerIsReloading = isReloading;
 
     // Process mobile action toggles
     if (mobileInput.crouch) {
@@ -691,62 +698,43 @@ export function Player() {
          )}
       </group>
 
-      {/* Floating Tactical Scope Reticle overlay if aiming */}
-      {isAiming && (
-         <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-50">
-            {/* Sniper Scope Vignette */}
-            <div className="absolute inset-0 bg-radial-vignette opacity-85"></div>
-            
-            {/* Crosshair circle with ticks */}
-            <div className="relative w-[320px] h-[320px] rounded-full border-[3px] border-black flex items-center justify-center">
-                {/* Horizontal grid line */}
-                <div className="absolute w-[300px] h-[1px] bg-black/80"></div>
-                {/* Vertical grid line */}
-                <div className="absolute h-[300px] w-[1px] bg-black/80"></div>
-                
-                {/* Red dot center */}
-                <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_red]"></div>
-                
-                {/* Tactical lines and range ticks */}
-                <div className="absolute top-[30%] h-3 w-[1px] bg-black"></div>
-                <div className="absolute top-[40%] h-3 w-[1px] bg-black"></div>
-                <div className="absolute bottom-[30%] h-3 w-[1px] bg-black"></div>
-                <div className="absolute bottom-[40%] h-3 w-[1px] bg-black"></div>
-                
-                <div className="absolute right-[30%] w-3 h-[1px] bg-black"></div>
-                <div className="absolute right-[40%] w-3 h-[1px] bg-black"></div>
-                <div className="absolute left-[30%] w-3 h-[1px] bg-black"></div>
-                <div className="absolute left-[40%] w-3 h-[1px] bg-black"></div>
+      <Html fullscreen style={{ pointerEvents: 'none' }}>
+        {/* Floating Tactical Scope Reticle overlay if aiming */}
+        {isAiming && (
+           <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-50">
+              {/* Sniper Scope Vignette */}
+              <div className="absolute inset-0 bg-radial-vignette opacity-85"></div>
+              
+              {/* Crosshair circle with ticks */}
+              <div className="relative w-[320px] h-[320px] rounded-full border-[3px] border-black flex items-center justify-center">
+                  {/* Horizontal grid line */}
+                  <div className="absolute w-[300px] h-[1px] bg-black/80"></div>
+                  {/* Vertical grid line */}
+                  <div className="absolute h-[300px] w-[1px] bg-black/80"></div>
+                  
+                  {/* Red dot center */}
+                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-[0_0_8px_red]"></div>
+                  
+                  {/* Tactical lines and range ticks */}
+                  <div className="absolute top-[30%] h-3 w-[1px] bg-black"></div>
+                  <div className="absolute top-[40%] h-3 w-[1px] bg-black"></div>
+                  <div className="absolute bottom-[30%] h-3 w-[1px] bg-black"></div>
+                  <div className="absolute bottom-[40%] h-3 w-[1px] bg-black"></div>
+                  
+                  <div className="absolute right-[30%] w-3 h-[1px] bg-black"></div>
+                  <div className="absolute right-[40%] w-3 h-[1px] bg-black"></div>
+                  <div className="absolute left-[30%] w-3 h-[1px] bg-black"></div>
+                  <div className="absolute left-[40%] w-3 h-[1px] bg-black"></div>
 
-                {/* Outer scope overlay markings */}
-                <span className="absolute top-2 text-[10px] text-green-500 font-mono font-bold">4X</span>
-                <span className="absolute bottom-4 text-[9px] text-green-500 font-mono">100M</span>
-            </div>
-         </div>
-      )}
+                  {/* Outer scope overlay markings */}
+                  <span className="absolute top-2 text-[10px] text-green-500 font-mono font-bold">4X</span>
+                  <span className="absolute bottom-4 text-[9px] text-green-500 font-mono">100M</span>
+              </div>
+           </div>
+        )}
 
-      {/* Screen HUD Indicators overlay (for Ammo status) */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-900/75 border border-slate-700/80 rounded-xl px-6 py-2.5 flex items-center gap-6 z-40 pointer-events-auto shadow-[0_4px_12px_rgba(0,0,0,0.5)]">
-         <div className="flex flex-col select-none text-left">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest font-sans">WEAPON</span>
-            <span className="text-white text-base font-black font-sans tracking-wide">M416 (AUTO)</span>
-         </div>
-         
-         <div className="w-[1px] h-8 bg-slate-700"></div>
-
-         <div className="flex items-baseline gap-1 select-none">
-            <span className={`text-3xl font-black font-sans ${ammo < 10 ? 'text-red-500 animate-pulse' : 'text-amber-400'}`}>
-               {isReloading ? '...' : ammo}
-            </span>
-            <span className="text-sm text-slate-400 font-bold">/ 120</span>
-         </div>
-
-         {isReloading && (
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-amber-500 text-black text-[10px] font-black uppercase px-3 py-1 rounded-full animate-bounce shadow-md font-sans">
-                RELOADING...
-            </div>
-         )}
-      </div>
+         {/* Vitals are now rendered in main App.tsx HUD */}
+      </Html>
     </>
   );
 }

@@ -268,9 +268,9 @@ export function Arena() {
 function Cloud({ position }: { position: [number, number, number] }) {
   const ref = useRef<THREE.Group>(null);
   
-  useFrame((state) => {
+  useFrame((state, delta) => {
       if (ref.current) {
-          ref.current.position.z += 8 * state.clock.getDelta(); // Wind speed
+          ref.current.position.z += 8 * delta; // Wind speed
           if (ref.current.position.z > 4000) ref.current.position.z = -4000;
       }
   });

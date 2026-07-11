@@ -70,6 +70,38 @@ interface GameStore {
   saveProgress: () => void;
   loadProgress: () => void;
   setSelectedStage: (stage: 'residential' | 'desert' | 'alien') => void;
+  setPlayerLevel: (level: number) => void;
+
+  // Arabic UI Cyber Sovereign States
+  currentScreen: 'lobby' | 'hangar' | 'campaign' | 'missions' | 'about';
+  isIntroActive: boolean;
+  setScreen: (screen: 'lobby' | 'hangar' | 'campaign' | 'missions' | 'about') => void;
+  setIntroActive: (active: boolean) => void;
+
+  // Customizations
+  migJetFlame: 'cyan' | 'purple' | 'amber';
+  migJetLivery: 'camo' | 'stealth' | 'sovereign';
+  exosuitArmorLvl: number; // 1, 2, 3
+  weaponPlasmaLvl: number; // 1, 2, 3
+  setHangarSpecs: (specs: Partial<{ migJetFlame: 'cyan' | 'purple' | 'amber'; migJetLivery: 'camo' | 'stealth' | 'sovereign'; exosuitArmorLvl: number; weaponPlasmaLvl: number }>) => void;
+
+  // Bottom Center Vitals & Active Weapon States
+  health: number;
+  armor: number;
+  energy: number;
+  ammo: number;
+  maxAmmo: number;
+  reserveAmmo: number;
+  activeWeapon: string;
+  setHealth: (health: number) => void;
+  setArmor: (armor: number) => void;
+  setEnergy: (energy: number) => void;
+  setAmmo: (ammo: number) => void;
+  setReserveAmmo: (reserveAmmo: number) => void;
+  setActiveWeapon: (weapon: string) => void;
+  useMedkit: () => void;
+  useArmorKit: () => void;
+  useEnergyDrink: () => void;
 
   startGame: () => void;
   endGame: () => void;
@@ -147,6 +179,57 @@ export const useGameStore = create<GameStore>((set, get) => ({
   xp: 0,
   selectedStage: 'residential',
   setSelectedStage: (stage) => set({ selectedStage: stage }),
+  setPlayerLevel: (playerLevel) => set({ playerLevel }),
+
+  // Arabic UI Cyber Sovereign initial states
+  currentScreen: 'lobby',
+  isIntroActive: true, // Starts with intro!
+  setScreen: (screen) => set({ currentScreen: screen }),
+  setIntroActive: (active) => set({ isIntroActive: active }),
+
+  // Hangar specs defaults
+  migJetFlame: 'cyan',
+  migJetLivery: 'sovereign',
+  exosuitArmorLvl: 1,
+  weaponPlasmaLvl: 1,
+  setHangarSpecs: (specs) => set((state) => ({ ...state, ...specs })),
+
+  // Initial values for HUD as requested: HEALTH (80%), ARMOR (60%), ENERGY (70%), activeWeapon HKA16 with 30/180 ammo
+  health: 80,
+  armor: 60,
+  energy: 70,
+  ammo: 30,
+  maxAmmo: 30,
+  reserveAmmo: 180,
+  activeWeapon: 'HKA16',
+  setHealth: (health) => set({ health }),
+  setArmor: (armor) => set({ armor }),
+  setEnergy: (energy) => set({ energy }),
+  setAmmo: (ammo) => set({ ammo }),
+  setReserveAmmo: (reserveAmmo) => set({ reserveAmmo }),
+  setActiveWeapon: (activeWeapon) => set({ activeWeapon }),
+  useMedkit: () => set((state) => {
+    if (state.gameState !== 'playing') return state;
+    return { 
+      health: 100, 
+      events: [...state.events, { id: Math.random().toString(), message: 'Quick Medkit used! HEALTH restored to 100%', timestamp: Date.now() }] 
+    };
+  }),
+  useArmorKit: () => set((state) => {
+    if (state.gameState !== 'playing') return state;
+    return { 
+      armor: 100, 
+      events: [...state.events, { id: Math.random().toString(), message: 'Armor Repair done! ARMOR restored to 100%', timestamp: Date.now() }] 
+    };
+  }),
+  useEnergyDrink: () => set((state) => {
+    if (state.gameState !== 'playing') return state;
+    return { 
+      energy: 100, 
+      events: [...state.events, { id: Math.random().toString(), message: 'Energy Drink consumed! ENERGY boosted to 100%', timestamp: Date.now() }] 
+    };
+  }),
+
   saveProgress: () => {
     const { playerLevel, xp } = get();
     localStorage.setItem('tenkel_progress', JSON.stringify({ playerLevel, xp }));
@@ -316,6 +399,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
       events: [],
       socket: newSocket,
       otherPlayers: {},
+      health: 80,
+      armor: 60,
+      energy: 70,
+      ammo: 30,
+      reserveAmmo: 180,
+      activeWeapon: 'HKA16',
     });
   },
 
@@ -358,11 +447,35 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   hitPlayer: () => set((state) => {
     if (state.playerState === 'disabled' || state.gameState !== 'playing') return state;
-    return {
-      playerState: 'disabled',
-      playerDisabledUntil: Date.now() + 3000,
-      score: Math.max(0, state.score - 50), // Penalty for getting hit
-    };
+    
+    // Calculate damage absorbed by armor
+    const damage = 25; // standard base damage
+    let newArmor = state.armor;
+    let newHealth = state.health;
+    
+    if (newArmor > 0) {
+      newArmor = Math.max(0, newArmor - damage * 0.6); // Armor absorbs 60% of damage
+      newHealth = Math.max(0, newHealth - damage * 0.4); // Player takes remaining 40%
+    } else {
+      newHealth = Math.max(0, newHealth - damage); // Player takes full damage if no armor
+    }
+    
+    if (newHealth <= 0) {
+      return {
+        health: 0,
+        armor: newArmor,
+        playerState: 'disabled',
+        playerDisabledUntil: Date.now() + 3000,
+        score: Math.max(0, state.score - 50), // Penalty for getting hit
+        events: [...state.events, { id: Math.random().toString(), message: 'AlphaOne STUNNED! Respawning in 3s...', timestamp: Date.now() }]
+      };
+    } else {
+      return {
+        health: newHealth,
+        armor: newArmor,
+        events: [...state.events, { id: Math.random().toString(), message: `AlphaOne hit! HEALTH: ${Math.floor(newHealth)}% | ARMOR: ${Math.floor(newArmor)}%`, timestamp: Date.now() }]
+      };
+    }
   }),
 
   hitEnemy: (id, byPlayer = false) => set((state) => {
@@ -452,7 +565,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
 
     if (state.playerState === 'disabled' && time > state.playerDisabledUntil) {
-      return { enemies, playerState: 'active', otherPlayers: playersChanged ? otherPlayers : state.otherPlayers };
+      return { 
+        enemies, 
+        playerState: 'active', 
+        otherPlayers: playersChanged ? otherPlayers : state.otherPlayers,
+        health: 80,
+        armor: 60,
+        energy: 70,
+        ammo: 30
+      };
     }
     return changed || playersChanged ? { enemies, otherPlayers } : state;
   }),

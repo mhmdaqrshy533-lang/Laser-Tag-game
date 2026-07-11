@@ -1,0 +1,92 @@
+name: Build Android APK (تنكيل-SGMW)
+
+on:
+  push:
+    branches: [ main, master, production ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    name: Build Signed Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies & Build Web App
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Initialize and Sync Capacitor (Android Wrapper)
+        run: |
+          # Install Capacitor core & CLI as devDependencies if not present
+          npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
+          
+          # Initialize Capacitor if capacitor.config.json or ts doesn't exist
+          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
+            npx cap init "Shadow Force" "com.shadowforce.game" --web-dir=dist
+          fi
+          
+          # Add android platform folder if it doesn't exist
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
+          
+          # Sync Web Assets into Native Android folder
+          npx cap sync android
+
+      - name: Build Android Release APK with Gradle
+        working-directory: android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
+
+      - name: Sign Android Release APK
+        id: sign_app
+        uses: r0adkll/sign-android-release@v1
+        with:
+          releaseDirectory: android/app/build/outputs/apk/release
+          signingKeyBase64: ${{ secrets.SIGNING_KEY }}
+          alias: ${{ secrets.ALIAS }}
+          keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+        continue-on-error: true # Keep compiled apk if signing secrets are not configured yet
+
+      - name: Rename and Prepare Build Artifacts
+        run: |
+          mkdir -p build-outputs
+          # Copy signed apk if it was created successfully
+          if [ -f "android/app/build/outputs/apk/release/app-release-unsigned-signed.apk" ]; then
+            cp android/app/build/outputs/apk/release/app-release-unsigned-signed.apk build-outputs/ShadowForce-Release-Signed.apk
+          elif [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk build-outputs/ShadowForce-Release.apk
+          else
+            # Fallback to general compiled APK outputs
+            find android/app/build/outputs/apk/ -name "*.apk" -exec cp {} build-outputs/ \;
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShadowForce-Android-Build
+          path: build-outputs/
+          retention-days: 7
