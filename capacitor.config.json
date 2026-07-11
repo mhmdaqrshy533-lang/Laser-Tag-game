@@ -1,0 +1,6 @@
+{
+  "appId": "com.shadowforce.game",
+  "appName": "Shadow Force",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

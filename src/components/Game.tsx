@@ -5,6 +5,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
+const AnyCanvas = Canvas as any;
 import { useGameStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -233,6 +234,28 @@ export function Game() {
   const stateRef = useRef<SharedGameState>(createInitialSharedState());
   const [canvasKey, setCanvasKey] = useState(0);
 
+  // Dynamic canvas sizing to override R3F ResizeObserver issues in rotated container
+  const [canvasSize, setCanvasSize] = useState(() => {
+    if (typeof window === 'undefined') return { width: 800, height: 600 };
+    const isPortrait = window.innerHeight > window.innerWidth;
+    return {
+      width: isPortrait ? window.innerHeight : window.innerWidth,
+      height: isPortrait ? window.innerWidth : window.innerHeight,
+    };
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      const isPortrait = window.innerHeight > window.innerWidth;
+      setCanvasSize({
+        width: isPortrait ? window.innerHeight : window.innerWidth,
+        height: isPortrait ? window.innerWidth : window.innerHeight,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Reset local coordinate logs on restart
   useEffect(() => {
     if (gameState === 'playing') {
@@ -356,8 +379,9 @@ export function Game() {
   return (
     <div className="w-full h-full relative" id="game-canvas-container">
       <WebGLBoundary onReset={handleCanvasReset}>
-        <Canvas 
+        <AnyCanvas 
           key={canvasKey}
+          size={canvasSize}
           shadows={!isMobile} 
           camera={{ fov: 75, near: 0.1, far: 8000 }}
           dpr={isMobile ? [1, 1.25] : [1, 2]}
@@ -412,7 +436,7 @@ export function Game() {
               <Bloom luminanceThreshold={1} mipmapBlur intensity={0.4} />
             </EffectComposer>
           )}
-        </Canvas>
+        </AnyCanvas>
       </WebGLBoundary>
     </div>
   );

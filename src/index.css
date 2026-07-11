@@ -33,3 +33,27 @@
 .hud-fire-glow {
   animation: pulse-glow 2s infinite ease-in-out;
 }
+
+/* Custom mobile landscape scaling for extreme responsiveness on all screens */
+@media (max-height: 520px) {
+  .hud-control-panel {
+    transform: scale(0.82) !important;
+    transform-origin: bottom right !important;
+  }
+  .hud-left-panel {
+    transform: scale(0.82) !important;
+    transform-origin: bottom left !important;
+  }
+}
+
+@media (max-height: 400px) {
+  .hud-control-panel {
+    transform: scale(0.7) !important;
+    transform-origin: bottom right !important;
+  }
+  .hud-left-panel {
+    transform: scale(0.7) !important;
+    transform-origin: bottom left !important;
+  }
+}
+

@@ -480,7 +480,7 @@ function HUD() {
       </div>
 
       {/* ----------------- LEFT-SIDE MOTION JOYSTICK & QUICK SLOTS ----------------- */}
-      <div className="absolute bottom-4 left-6 flex flex-col gap-3 pointer-events-auto z-40 select-none">
+      <div className="absolute bottom-4 left-6 flex flex-col gap-3 pointer-events-auto z-40 select-none hud-left-panel">
          
          {/* Draggable Virtual Joystick */}
          <div className="flex items-center gap-4">
@@ -587,7 +587,7 @@ function HUD() {
       </div>
 
       {/* ----------------- ACTION HUB (RIGHT SIDE ARCD CONTROLS) ----------------- */}
-      <div className="absolute right-4 bottom-4 w-[280px] h-[280px] pointer-events-none z-40 select-none">
+      <div className="absolute right-4 bottom-4 w-[280px] h-[280px] pointer-events-none z-40 select-none hud-control-panel">
          
          {/* Large Circular Action Fire Button */}
          <div className="absolute bottom-6 right-6 pointer-events-auto">

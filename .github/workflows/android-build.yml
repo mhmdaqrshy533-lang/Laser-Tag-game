@@ -38,14 +38,6 @@ jobs:
 
       - name: Initialize and Sync Capacitor (Android Wrapper)
         run: |
-          # Install Capacitor core & CLI as devDependencies if not present
-          npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
-          
-          # Initialize Capacitor if capacitor.config.json or ts doesn't exist
-          if [ ! -f "capacitor.config.json" ] && [ ! -f "capacitor.config.ts" ]; then
-            npx cap init "Shadow Force" "com.shadowforce.game" --web-dir=dist
-          fi
-          
           # Add android platform folder if it doesn't exist
           if [ ! -d "android" ]; then
             npx cap add android
