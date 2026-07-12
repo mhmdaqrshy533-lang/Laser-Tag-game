@@ -5,7 +5,7 @@
 
 import React, { useRef, useMemo, useEffect, useState, Component, ErrorInfo, ReactNode } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { Sky } from '@react-three/drei';
+import { Sky, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { SharedGameState, createInitialSharedState } from './PhysicsEngine';
 import { useGameStore } from '../store';
@@ -745,7 +745,23 @@ export function ArenaVisual() {
     <group>
       {/* 1. Procedural Sky & Ambient sun light - Highly dramatic sunset */}
       <Sky sunPosition={[150, 15, -100]} turbidity={10} rayleigh={6} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      
+      <color attach="background" args={['#87CEEB']} />
+      <fog attach="fog" args={['#87CEEB', 200, 3000]} />
+      <ambientLight intensity={0.8} />
+      <directionalLight 
+        position={[100, 100, 50]} 
+        intensity={1.5} 
+        castShadow
+        shadow-mapSize={[1024, 1024]}
+      />
 
+      {/* Massive Grass Ground */}
+      <mesh receiveShadow position={[0, -5.0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[20000, 20000]} />
+        <meshStandardMaterial color="#166534" roughness={1.0} metalness={0.0} />
+      </mesh>
+      
       {/* 2. Runway Asphalt center strip */}
       <mesh receiveShadow position={[0, -4.95, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[90, 12000]} />
@@ -993,6 +1009,12 @@ export function VisualSoldierMesh({ getPhysicsState, stance = 'stand', isMoving 
           <mesh castShadow>
             <boxGeometry args={[0.08, 0.15, 0.9]} />
             <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
+                  <Text position={[-3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1" font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZhrib2Bg-4.ttf">
+                    TANKEEL
+                  </Text>
+                  <Text position={[3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1">
+                    تَنكِيل
+                  </Text>
           </mesh>
           <mesh position={[0, 0.02, -0.7]} rotation={[Math.PI / 2, 0, 0]} castShadow>
             <cylinderGeometry args={[0.022, 0.022, 0.6]} />
@@ -1028,11 +1050,13 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
   const meshRef = useRef<THREE.Group>(null);
   const flashGroupRef = useRef<THREE.Group>(null);
   const bodyGroupRef = useRef<THREE.Group>(null);
+  const planeGroupRef = useRef<THREE.Group>(null);  const soldierGroupRef = useRef<THREE.Group>(null);
   const { camera } = useThree();
 
   // Sync coordinates inside useFrame, completely skipping re-renders of the general UI
   useFrame((state, delta) => {
     const player = stateRef.current.player;
+    if (planeGroupRef.current) planeGroupRef.current.visible = !!player.inVehicle;    if (soldierGroupRef.current) soldierGroupRef.current.visible = !player.inVehicle;
 
     // Update Cinematic Engine
     cinematicEngine.update(delta, state.clock.getElapsedTime());
@@ -1100,12 +1124,12 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
         // Camera is right at the front of the plane cockpit
         eyePos.add(new THREE.Vector3(0, 0, 0).applyEuler(new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ'))).add(shakeOffset);
         camera.position.copy(eyePos);
-        camera.rotation.set(player.pitch, player.yaw + Math.PI, 0, 'YXZ');
+        camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
       } else {
         const eyeHeight = player.stance === 'crouch' ? 0.3 : player.stance === 'prone' ? -0.8 : 1.45;
         const eyePos = player.position.clone().add(new THREE.Vector3(0, eyeHeight, 0)).add(shakeOffset);
         camera.position.copy(eyePos);
-        camera.rotation.set(player.pitch, player.yaw + Math.PI, 0, 'YXZ');
+        camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ');
       }
     } else {
       // Third Person Behind-Shoulder Camera with cinematic OTS Lerp
@@ -1139,23 +1163,26 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
          
          const lookOffset = player.stance === 'crouch' ? 0.5 : player.stance === 'prone' ? -0.4 : 1.2;
          const lookTarget = player.position.clone().add(new THREE.Vector3(0, lookOffset, 0));
-         camera.lookAt(lookTarget);
       }
     }
   });
-
   return (
     <group>
       {/* Soldier visual body - Hidden in FPP Mode for gameplay realism */}
       <group ref={meshRef}>
         <group ref={bodyGroupRef}>
-          {useGameStore.getState().selectedStage === 'desert' ? (
-             <group>
+             <group ref={planeGroupRef}>
                {/* Stealth Plane Flying Wing design */}
                <mesh castShadow rotation={[0, Math.PI, 0]}>
                   {/* Flattened triangle/wing shape */}
                   <coneGeometry args={[12, 18, 3, 1, false, 0, Math.PI]} />
                   <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
+                  <Text position={[-3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1" font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZhrib2Bg-4.ttf">
+                    TANKEEL
+                  </Text>
+                  <Text position={[3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1">
+                    تَنكِيل
+                  </Text>
                </mesh>
                {/* Cockpit canopy */}
                <mesh position={[0, 1.5, 2]} rotation={[0, Math.PI, 0]}>
@@ -1163,23 +1190,21 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
                  <meshStandardMaterial color="#000000" metalness={1.0} roughness={0.0} />
                </mesh>
              </group>
-          ) : (
-            <VisualSoldierMesh 
-              getPhysicsState={() => {
-                const p = stateRef.current.player;
-                return {
-                  stance: p.stance,
-                  isMoving: p.isMoving,
-                  isAiming: p.isAiming
-                };
-              }}
-              color="#10b981" 
-            />
-          )}
+             <group ref={soldierGroupRef}>
+               <VisualSoldierMesh 
+                 getPhysicsState={() => {
+                  const p = stateRef.current.player;
+                  return {
+                    stance: p.stance,
+                    isMoving: p.isMoving,
+                    isAiming: p.isAiming
+                  };
+                }}
+                color="#10b981" 
+               />
+             </group>
         </group>
       </group>
-
-      {/* Muzzle Flash dynamic lighting */}
       <group ref={flashGroupRef} visible={false}>
         <mesh>
           <sphereGeometry args={[0.45, 8, 8]} />
@@ -1215,16 +1240,43 @@ export function EnemyVisual({ stateRef, botId }: { stateRef: React.MutableRefObj
   });
 
   const enemy = stateRef.current.enemies[botId];
+  if (enemy?.type === 'facility') {
+    return (
+      <group ref={meshRef}>
+        {enemy.health > 0 ? (
+          <group>
+            <mesh castShadow receiveShadow position={[0, 20, 0]}>
+              <boxGeometry args={[40, 40, 40]} />
+              <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
+            </mesh>
+            <mesh position={[0, 45, 0]}>
+              <sphereGeometry args={[10, 16, 16]} />
+              <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={2} />
+            </mesh>
+            {/* Simple Health bar */}
+            <mesh position={[0, 60, 0]}>
+               <planeGeometry args={[(enemy.health / 1000) * 30, 2]} />
+               <meshBasicMaterial color="red" />
+            </mesh>
+          </group>
+        ) : (
+          <mesh position={[0, 10, 0]}>
+            <boxGeometry args={[40, 20, 40]} />
+            <meshStandardMaterial color="#333" metalness={0.9} roughness={0.9} />
+          </mesh>
+        )}
+      </group>
+    );
+  }
   if (enemy?.type === 'boss') {
     return <BossVisual stateRef={stateRef} bossId={botId} />;
   }
-
   return (
     <group ref={meshRef}>
       {/* Active Group */}
       <group ref={activeGroupRef}>
-        <VisualSoldierMesh 
-          getPhysicsState={() => {
+        <VisualSoldierMesh
+            getPhysicsState={() => {
             const enemy = stateRef.current.enemies[botId];
             return {
               stance: 'stand',
@@ -1232,11 +1284,10 @@ export function EnemyVisual({ stateRef, botId }: { stateRef: React.MutableRefObj
               isAiming: enemy ? enemy.isAiming : false
             };
           }}
-          color="#f97316" 
-          isEnemy={true}
+          color="#f97316"
+           isEnemy={true}
         />
       </group>
-
       {/* Stunned Group */}
       <group ref={stunnedGroupRef} visible={false}>
         <mesh position={[0, 1.2, 0]}>
@@ -1245,18 +1296,16 @@ export function EnemyVisual({ stateRef, botId }: { stateRef: React.MutableRefObj
         </mesh>
         <group rotation={[Math.PI / 2, 0, 0]}>
           <VisualSoldierMesh 
-            stance="prone" 
-            isMoving={false} 
-            isAiming={false} 
-            color="#3b82f6" 
-            isEnemy={true}
+             getPhysicsState={() => ({ stance: 'prone', isMoving: false, isAiming: false })}
+             color="#3b82f6" 
+             isEnemy={true}
           />
         </group>
       </group>
     </group>
   );
-}
 
+}
 // ==========================================
 // 7. MULTIPLAYER OTHER PLAYERS VISUALIZER
 // ==========================================
@@ -1277,11 +1326,9 @@ export function OtherPlayerVisual({ id }: { id: string }) {
   return (
     <group ref={meshRef}>
       <VisualSoldierMesh 
-        stance="stand" 
-        isMoving={false} 
-        isAiming={false} 
-        color={data.color || '#ec4899'} 
-      />
+         getPhysicsState={() => ({ stance: 'stand', isMoving: false, isAiming: false })}
+         color={data.color || '#ec4899'} 
+       />
     </group>
   );
 }
@@ -1439,7 +1486,6 @@ export function ChronosEffect() {
     </>
   );
 }
-
 export function ShieldGeneratorVisual({ id }: { id: string }) {
   const meshRef = useRef<THREE.Group>(null);
   const generator = useGameStore(state => state.shieldGenerators.find(g => g.id === id));
@@ -1483,6 +1529,7 @@ export function ShieldGeneratorVisual({ id }: { id: string }) {
           <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} />
         </mesh>
       )}
+      
     </group>
   );
 }
@@ -1491,14 +1538,11 @@ export function DesertVisual() {
   const { camera } = useThree();
   const dunesRef = useRef<THREE.Mesh>(null);
   
-  useMemo(() => {
-    // We can't easily displace vertices dynamically in the same way without a shader,
-    // so we'll just let it be a vast flat/bumpy plane for performance,
-    // or add a simple noise shader.
-  }, []);
+
 
   return (
     <group>
+      <color attach="background" args={['#d97706']} />
       <Sky sunPosition={[500, 50, -1000]} turbidity={0.6} rayleigh={2} mieCoefficient={0.005} mieDirectionalG={0.8} />
       <ambientLight intensity={0.2} color="#fca5a5" />
       <directionalLight position={[500, 50, -1000]} intensity={1.5} color="#fb923c" castShadow />
@@ -1509,6 +1553,29 @@ export function DesertVisual() {
         <planeGeometry args={[20000, 20000]} />
         <meshStandardMaterial color="#92400e" roughness={0.9} metalness={0.1} />
       </mesh>
+
+      {/* Procedural Mountains/Hills */}
+      {Array.from({ length: 20 }).map((_, i) => (
+         <mesh 
+           key={`mtn-${i}`}
+           position={[Math.sin(i * 123) * 5000, -80, Math.cos(i * 456) * 5000]} 
+           rotation={[0, i, 0]}
+         >
+           <coneGeometry args={[1000 + Math.random() * 500, 1500 + Math.random() * 1000, 4]} />
+           <meshStandardMaterial color="#78350f" />
+         </mesh>
+      ))}
+
+      {/* Scattered Rocks */}
+      {Array.from({ length: 100 }).map((_, i) => (
+         <mesh 
+           key={`rock-${i}`}
+           position={[Math.sin(i * 99) * 3000, -95, Math.cos(i * 88) * 3000]} 
+         >
+           <dodecahedronGeometry args={[50 + Math.random() * 100]} />
+           <meshStandardMaterial color="#57534e" />
+         </mesh>
+      ))}
     </group>
   );
 }

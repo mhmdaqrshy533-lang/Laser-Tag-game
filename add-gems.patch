@@ -1,0 +1,20 @@
+--- src/store.ts
++++ src/store.ts
+@@ -62,6 +62,8 @@
+   coins: number;
++  gems: number;
+   gameState: 'menu' | 'playing' | 'gameover' | 'victory';
+@@ -107,6 +109,7 @@
+   winGame: () => void;
+@@ -183,6 +186,7 @@
+   coins: 0,
++  gems: 0,
+   gameState: 'menu',
+@@ -449,6 +453,10 @@
+     }
+     set({ gameState: 'gameover', socket: null });
+   },
++  winGame: () => {
++    // Give 2 gems on win
++    set((state) => ({ gameState: 'victory', gems: state.gems + 2 }));
++  },

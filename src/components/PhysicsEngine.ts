@@ -15,10 +15,12 @@ export interface PlayerPhysicsState {
   isMoving: boolean;
   isAiming: boolean;
   isFPP: boolean;
+  inVehicle?: boolean;
   isReloading: boolean;
   recoilOffset: number;
   showMuzzleFlash: boolean;
   muzzleFlashPos: [number, number, number];
+  shootCooldown?: number;
   ammo: number;
   health: number;
   armor: number;
@@ -27,7 +29,7 @@ export interface PlayerPhysicsState {
 
 export interface EnemyPhysicsState {
   id: string;
-  type: 'soldier' | 'boss' | 'drone';
+  type: 'soldier' | 'boss' | 'drone' | 'facility';
   position: THREE.Vector3;
   yaw: number;
   pitch: number;
@@ -48,49 +50,51 @@ export interface SharedGameState {
   selectedStage?: string;
 }
 
-export const createInitialSharedState = (): SharedGameState => ({
-  player: {
-    position: new THREE.Vector3(0, -3.9, 0),
-    velocity: new THREE.Vector3(0, 0, 0),
-    velocityY: 0,
-    yaw: 0,
-    pitch: 0.1,
-    stance: 'stand',
-    isMoving: false,
-    isAiming: false,
-    isFPP: false,
-    isReloading: false,
-    recoilOffset: 0,
-    showMuzzleFlash: false,
-    muzzleFlashPos: [0, 0, 0],
-    ammo: 30,
-    health: 80,
-    armor: 60,
-    energy: 70,
-  },
-  enemies: {
-    'bot-1': { id: 'bot-1', type: 'soldier', position: new THREE.Vector3(40, -3.9, 40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} },
-    'bot-2': { id: 'bot-2', type: 'soldier', position: new THREE.Vector3(-40, -3.9, 40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} },
-    'bot-3': { id: 'bot-3', type: 'soldier', position: new THREE.Vector3(40, -3.9, -40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} },
-    'bot-4': { id: 'bot-4', type: 'soldier', position: new THREE.Vector3(-40, -3.9, -40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} },
-    'boss-1': { 
-      id: 'boss-1', 
-      type: 'boss', 
-      position: new THREE.Vector3(0, -3.9, -200), 
-      yaw: Math.PI, 
-      pitch: 0, 
-      isMoving: false, 
-      isAiming: false, 
-      state: 'scripted', 
-      health: 2000, 
-      maxHealth: 2000, 
-      disabledUntil: 0, 
-      shootTimer: 0, 
-      userData: { phase: 1 } 
-    }
-  },
-  scriptedEvents: []
-});
+export const createInitialSharedState = (stage: string = 'residential'): SharedGameState => {
+  const isDesert = stage === 'desert';
+  
+  const enemies: Record<string, EnemyPhysicsState> = {};
+  
+  if (isDesert) {
+    // 3 Facilities for Mercury-X
+    enemies['facility-1'] = { id: 'facility-1', type: 'facility', position: new THREE.Vector3(500, -100, -2000), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 1000, maxHealth: 1000, disabledUntil: 0, shootTimer: 0, userData: {} };
+    enemies['facility-2'] = { id: 'facility-2', type: 'facility', position: new THREE.Vector3(-800, -100, -3500), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 1000, maxHealth: 1000, disabledUntil: 0, shootTimer: 0, userData: {} };
+    enemies['facility-3'] = { id: 'facility-3', type: 'facility', position: new THREE.Vector3(200, -100, -5000), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 1000, maxHealth: 1000, disabledUntil: 0, shootTimer: 0, userData: {} };
+  } else {
+    // Standard residential bots
+    enemies['bot-1'] = { id: 'bot-1', type: 'soldier', position: new THREE.Vector3(40, -3.9, 40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} };
+    enemies['bot-2'] = { id: 'bot-2', type: 'soldier', position: new THREE.Vector3(-40, -3.9, 40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} };
+    enemies['bot-3'] = { id: 'bot-3', type: 'soldier', position: new THREE.Vector3(40, -3.9, -40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} };
+    enemies['bot-4'] = { id: 'bot-4', type: 'soldier', position: new THREE.Vector3(-40, -3.9, -40), yaw: 0, pitch: 0, isMoving: false, isAiming: false, state: 'active', health: 100, maxHealth: 100, disabledUntil: 0, shootTimer: Math.random() * 3, userData: {} };
+    enemies['boss-1'] = { id: 'boss-1', type: 'boss', position: new THREE.Vector3(0, -3.9, -200), yaw: Math.PI, pitch: 0, isMoving: false, isAiming: false, state: 'scripted', health: 2000, maxHealth: 2000, disabledUntil: 0, shootTimer: 0, userData: { phase: 1 } };
+  }
+
+  return {
+    player: {
+      position: isDesert ? new THREE.Vector3(0, 500, 0) : new THREE.Vector3(0, -3.9, 0),
+      velocity: new THREE.Vector3(0, 0, 0),
+      velocityY: 0,
+      yaw: 0,
+      pitch: isDesert ? -0.1 : 0.1,
+      stance: 'stand',
+      isMoving: false,
+      isAiming: false,
+      isFPP: isDesert ? true : false,
+      inVehicle: isDesert ? true : false,
+      isReloading: false,
+      recoilOffset: 0,
+      showMuzzleFlash: false,
+      muzzleFlashPos: [0, 0, 0],
+      ammo: 30,
+      health: 80,
+      armor: 60,
+      energy: 70,
+    },
+    enemies,
+    scriptedEvents: [],
+    selectedStage: stage
+  };
+};
 
 /**
  * 60Hz Fixed Timestep Simulator.
@@ -109,6 +113,7 @@ export function simulateFixedStep(
   actions: {
     hitPlayer: () => void;
     hitEnemy: (id: string, byPlayer?: boolean) => void;
+    winGame: () => void;
     addLaser: (start: [number, number, number], end: [number, number, number], color: string) => void;
     addParticles: (position: [number, number, number], color: string) => void;
     toggleTimeDilation: (active: boolean) => void;
@@ -117,6 +122,17 @@ export function simulateFixedStep(
   }
 ) {
   if (gameState !== 'playing') return;
+
+  // Check Win Condition (Facilities destroyed)
+  if (state.selectedStage === 'desert' && state.player.inVehicle) {
+    const allFacilitiesDestroyed = ['facility-1', 'facility-2', 'facility-3'].every(
+      id => !state.enemies[id] || state.enemies[id].health <= 0
+    );
+    if (allFacilitiesDestroyed && !state.scriptedEvents.includes('win_triggered')) {
+      state.scriptedEvents.push('win_triggered');
+      actions.winGame();
+    }
+  }
 
   const timeScale = state.timeScale || 1.0;
 
@@ -156,16 +172,16 @@ function updatePhysics(
   const pDt = dt * playerTimeMult;
   const worldDt = dt * timeScale;
 
-  if (state.selectedStage === 'desert') {
+  if (state.selectedStage === 'desert' && state.player.inVehicle) {
     // 1. Stealth Plane Flight Mechanics
     const speed = 150; 
     
     // Auto-leveling or manual control
     // Mobile input look Y maps to pitch, X maps to yaw
-    if (keys.w) player.pitch -= 1.5 * pDt;
-    if (keys.s) player.pitch += 1.5 * pDt;
-    if (keys.a) player.yaw += 1.5 * pDt;
-    if (keys.d) player.yaw -= 1.5 * pDt;
+    if (keys.w || mobileInput.move.y < -0.1) player.pitch -= 1.5 * pDt;
+    if (keys.s || mobileInput.move.y > 0.1) player.pitch += 1.5 * pDt;
+    if (keys.a || mobileInput.move.x < -0.1) player.yaw += 1.5 * pDt;
+    if (keys.d || mobileInput.move.x > 0.1) player.yaw -= 1.5 * pDt;
     
     // Clamp pitch
     player.pitch = Math.max(-Math.PI/2.2, Math.min(Math.PI/2.2, player.pitch));
@@ -176,11 +192,35 @@ function updatePhysics(
     player.position.addScaledVector(forwardVec, speed * pDt);
     
     // Floor collision
-    if (player.position.y < -5) {
-      player.position.y = -5;
+    if (player.position.y < -95) {
+      player.position.y = -95;
       player.pitch = Math.min(0, player.pitch);
     }
     
+    // Plane Sniper Shooting
+    player.shootCooldown = (player.shootCooldown || 0) - pDt;
+    if ((keys[" "] || mobileInput.shooting) && player.shootCooldown <= 0) {
+       player.shootCooldown = 2.0; // Sniper cooldown
+       const spawnPos = player.position.clone().add(forwardVec.clone().multiplyScalar(10));
+       const endPos = spawnPos.clone().add(forwardVec.clone().multiplyScalar(5000)); // Longer range
+       actions.addLaser([spawnPos.x, spawnPos.y, spawnPos.z], [endPos.x, endPos.y, endPos.z], "#ff0000");
+       
+       // Check for facility hit
+       for (const id in state.enemies) {
+           const enemy = state.enemies[id];
+           if (enemy.health > 0) {
+               // ...
+               const line = new THREE.Line3(spawnPos, endPos);
+               const closestPoint = new THREE.Vector3();
+               line.closestPointToPoint(enemy.position, true, closestPoint);
+               if (closestPoint.distanceTo(enemy.position) < 30) { // Slightly smaller hitbox for sniper
+                   actions.hitEnemy(id, true);
+                   actions.addParticles([closestPoint.x, closestPoint.y, closestPoint.z], "#ef4444");
+               }
+           }
+       }
+    }
+
     if (actions.setPlaneStats) {
        actions.setPlaneStats(850 + (player.pitch * -200), 12400 + player.position.y * 10);
     }

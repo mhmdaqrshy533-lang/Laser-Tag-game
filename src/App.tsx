@@ -8,14 +8,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Game } from './components/Game';
 import { useGameStore } from './store';
 import CinematicIntro from './components/CinematicIntro';
-import LobbyScreen from './components/LobbyScreen';
+import { PlanetSelection } from "./components/PlanetSelection";
 import HangarScreen from './components/HangarScreen';
 import CampaignScreen from './components/CampaignScreen';
 import MissionsScreen from './components/MissionsScreen';
 import AboutScreen from './components/AboutScreen';
 import { sound } from './components/SoundSystem';
 import { 
-  Settings, 
+  Settings, Trophy, 
   Volume2, 
   VolumeX, 
   Mic, 
@@ -67,7 +67,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-import { StealthHUD } from './components/StealthHUD';
+import { SpaceHUD } from './components/SpaceHUD';
 
 function HUD() {
   const selectedStage = useGameStore(state => state.selectedStage);
@@ -323,7 +323,7 @@ function HUD() {
   }, []);
 
   if (selectedStage === 'desert') {
-    return <StealthHUD />;
+    return <SpaceHUD />;
   }
 
   return (
@@ -881,7 +881,7 @@ export default function App() {
            </div>
         </div>
       ) : isIntroActive ? (
-        <CinematicIntro />
+        <CinematicIntro onComplete={() => useGameStore.getState().setIntroActive(false)} />
       ) : (
         <>
           {/* 3D Game Stage Canvas */}
@@ -893,43 +893,64 @@ export default function App() {
           {gameState === 'playing' && <HUD />}
 
           {/* ----------------- TACTICAL SOVEREIGN LOBBY / SUB-SCREENS ----------------- */}
-          {gameState === 'menu' && (
-            <div className="absolute inset-0 bg-slate-950/80 flex items-center justify-center z-10 pointer-events-auto p-4 md:p-6 select-none animate-fade-in">
-              <div className="max-w-6xl w-full h-[90vh] flex flex-col">
-                {currentScreen === 'lobby' && <LobbyScreen />}
-                {currentScreen === 'hangar' && <HangarScreen />}
-                {currentScreen === 'campaign' && <CampaignScreen />}
-                {currentScreen === 'missions' && <MissionsScreen />}
-                {currentScreen === 'about' && <AboutScreen />}
-              </div>
-            </div>
-          )}
+          {gameState === 'menu' && <PlanetSelection />}
 
+          {/* ----------------- GAME OVER / RETRY VIEW ----------------- */}
           {/* ----------------- GAME OVER / RETRY VIEW ----------------- */}
           {gameState === 'gameover' && (
             <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center z-10 pointer-events-auto p-4">
               <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col items-center shadow-2xl text-center">
-                 
                  <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center text-red-500 mb-4 animate-pulse">
                     <RotateCcw size={32} />
                  </div>
-
                  <h1 className="text-3xl font-black text-red-500 mb-2 tracking-tighter uppercase">
-                   Match Terminated
+                   تم تدميرك
                  </h1>
-                 
-                 <div className="text-base text-slate-400 mb-6 font-bold uppercase">
-                    Your Score: <span className="text-amber-400">{score}</span>
+                 <p className="text-slate-400 mb-8 font-medium">MISSION FAILED</p>
+                 <div className="flex gap-4 w-full">
+                   <button 
+                     onClick={() => useGameStore.getState().startGame()}
+                     className="flex-1 bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold transition-all active:scale-95 shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                   >
+                     RETRY
+                   </button>
+                   <button 
+                     onClick={() => useGameStore.getState().leaveGame()}
+                     className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold transition-all active:scale-95"
+                   >
+                     ABORT
+                   </button>
                  </div>
-                 
-                 <button
-                   onClick={() => {
-                     sound.playWeaponCharge();
-                     startGame();
-                   }}
-                   className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-black text-base font-black uppercase tracking-widest rounded-xl transition-all duration-150 active:scale-95 shadow-[0_4px_15px_rgba(245,158,11,0.2)]"
+              </div>
+            </div>
+          )}
+
+          {/* ----------------- VICTORY VIEW ----------------- */}
+          {gameState === 'victory' && (
+            <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center z-10 pointer-events-auto p-4">
+              <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 flex flex-col items-center shadow-2xl text-center">
+                 <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center text-amber-500 mb-4 animate-pulse">
+                    <Trophy size={32} />
+                 </div>
+                 <h1 className="text-4xl font-black text-amber-500 mb-2 tracking-tighter dir-rtl">
+                   نجاح المهمة
+                 </h1>
+                 <p className="text-slate-400 mb-4 font-medium">MISSION ACCOMPLISHED</p>
+                 <div className="bg-slate-800/50 w-full p-4 rounded-xl mb-8 flex flex-col gap-2">
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-300">
+                      <span>النقاط</span>
+                      <span className="text-emerald-400">{score.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm font-bold text-slate-300">
+                      <span>الجواهر المكتسبة</span>
+                      <span className="text-[#00f3ff]">+2</span>
+                    </div>
+                 </div>
+                 <button 
+                   onClick={() => useGameStore.getState().leaveGame()}
+                   className="w-full bg-amber-600 hover:bg-amber-500 text-white py-3 rounded-xl font-bold transition-all active:scale-95 shadow-[0_0_20px_rgba(217,119,6,0.4)]"
                  >
-                   Play Again
+                   عودة إلى القاعدة (RETURN TO BASE)
                  </button>
               </div>
             </div>

@@ -12,7 +12,7 @@ export type EntityState = 'active' | 'disabled';
 
 export interface EnemyData {
   id: string;
-  type?: 'soldier' | 'boss' | 'drone';
+  type?: 'soldier' | 'boss' | 'drone' | 'facility';
   position: [number, number, number];
   state: EntityState;
   disabledUntil: number;
@@ -53,8 +53,10 @@ export interface GameEvent {
 }
 
 interface GameStore {
-  gameState: GameState;
+  gameState: GameState | 'victory';
   score: number;
+  coins: number;
+  gems: number;
   timeLeft: number;
   playerState: EntityState;
   playerDisabledUntil: number;
@@ -115,6 +117,7 @@ interface GameStore {
 
   startGame: () => void;
   endGame: () => void;
+  winGame: () => void;
   leaveGame: () => void;
   updateTime: (delta: number) => void;
   hitPlayer: () => void;
@@ -167,6 +170,8 @@ const INITIAL_ENEMIES: EnemyData[] = [
 export const useGameStore = create<GameStore>((set, get) => ({
   gameState: 'menu',
   score: 0,
+  coins: 0,
+  gems: 0,
   timeLeft: 120, // 2 minutes
   playerState: 'active',
   playerDisabledUntil: 0,
@@ -447,6 +452,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       socket.disconnect();
     }
     set({ gameState: 'gameover', socket: null });
+  },
+  winGame: () => {
+    const { socket } = get();
+    if (socket) {
+      socket.disconnect();
+    }
+    set((state) => ({ gameState: 'victory', gems: state.gems + 2, socket: null }));
   },
 
   leaveGame: () => {

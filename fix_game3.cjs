@@ -1,4 +1,5 @@
-/**
+const fs = require('fs');
+const code = `/**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -66,9 +67,8 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
     shootRef.current = () => {
        const physState = stateRef.current;
        if (!physState) return;
-       const winKeys = (window as any).keys || {};
-       winKeys[' '] = true;
-       setTimeout(() => { winKeys[' '] = false; }, 100);
+       physState.player.isShooting = true;
+       setTimeout(() => { physState.player.isShooting = false; }, 100);
     };
     triggerReloadRef.current = () => {
        const physState = stateRef.current;
@@ -85,29 +85,26 @@ function GameLoop({ stateRef, triggerReloadRef, shootRef }: LoopProps) {
 
     physState.selectedStage = store.selectedStage;
 
-    const winKeys = (window as any).keys || {};
-    const mobileInput = store.mobileInput || { move: {x: 0, y: 0}, look: {x: 0, y: 0}, shooting: false };
-    const keys = { 
-      w: winKeys.w || false, 
-      a: winKeys.a || false, 
-      s: winKeys.s || false, 
-      d: winKeys.d || false, 
-      ' ': winKeys[' '] || false, 
-      shift: winKeys.shift || false 
-    };
+    const keys = { ...store.keys };
+    if (store.joystickMove) {
+      keys.w = store.joystickMove.y > 0.5;
+      keys.s = store.joystickMove.y < -0.5;
+      keys.a = store.joystickMove.x < -0.5;
+      keys.d = store.joystickMove.x > 0.5;
+    }
 
     simulateFixedStep(
       physState, 
-      keys,
-      mobileInput,
       delta, 
+      keys, 
+      camera, 
       store.playerLevel,
       store.gameState,
       store.playerState,
       {
         hitPlayer: store.hitPlayer,
         hitEnemy: store.hitEnemy,
-        winGame: store.winGame,
+        winGame: () => store.setGameState('won'),
         addLaser: (start, end, color) => {
            if ((window as any).addLaser) (window as any).addLaser(start, end, color);
         },
@@ -264,3 +261,6 @@ function OtherPlayersRenderer() {
      </>
    );
 }
+`;
+
+fs.writeFileSync('src/components/Game.tsx', code);
