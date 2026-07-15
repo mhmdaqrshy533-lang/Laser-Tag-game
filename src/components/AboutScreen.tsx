@@ -60,7 +60,7 @@ export default function AboutScreen() {
               <span>الرؤية التقنية الهندسية للمشروع</span>
             </span>
             <p className="text-xs text-slate-300 leading-relaxed font-medium">
-               يتم بناء مشروع <b>تنكيل (Shadow Force)</b> كأنموذج برمجية قتالية سيادية عالية الأداء، مصمم بالكامل لتجاوز الأطر البرمجية المعتادة. نسعى لبناء بيئة محاكاة تكتيكية متقدمة تجمع بين فيزياء الطيران الجوي والالتحام البري التكتيكي لتأكيد ريادة السيطرة الإلكترونية الكاملة.
+               يتم بناء مشروع <b>Galaxy Division</b> كأنموذج برمجية قتالية سيادية عالية الأداء، مصمم بالكامل لتجاوز الأطر البرمجية المعتادة. نسعى لبناء بيئة محاكاة تكتيكية متقدمة تجمع بين فيزياء الطيران الجوي والالتحام البري التكتيكي لتأكيد ريادة السيطرة الإلكترونية الكاملة.
             </p>
           </div>
         </div>
@@ -73,56 +73,44 @@ export default function AboutScreen() {
         </div>
       </div>
 
-      {/* RIGHT COLUMN: Project Technical Specifications & Documentaries */}
+      {/* RIGHT COLUMN: Game Description */}
       <div className="flex-1 flex flex-col gap-5 bg-black/60 p-5 rounded-2xl border border-slate-800 backdrop-blur-md justify-between">
         <div className="flex flex-col gap-4">
           <div className="border-b border-slate-800 pb-3 flex items-center gap-2">
             <Radio className="text-[#00f3ff] animate-pulse" size={18} />
             <span className="font-sans font-black text-base text-white tracking-wider">
-               التوثيق الهندسي والسيادي للآلة
+               عن اللعبة (Galaxy Division)
             </span>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {/* Spec item 1 */}
-            <div className="flex items-start gap-3 p-3 bg-slate-950/70 rounded-xl border border-slate-900">
-              <div className="w-1.5 h-1.5 bg-[#00f3ff] rounded-full mt-1.5"></div>
-              <div>
-                <h5 className="text-xs font-black text-white">نظام التبديل اللامركزي (State Synchronizer)</h5>
-                <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                  تدار الشاشات والبيانات الحيوية عبر Zustand صامت وعالي الفعالية، مما يضمن تدفق وتحديث بيانات الصحة والدرع دون التسبب بانهيارات أو إعادة رندرة غير مبررة للـ Canvas.
-                </p>
-              </div>
-            </div>
+          <div className="text-[11px] text-slate-300 leading-relaxed font-medium overflow-y-auto pr-2 h-[450px]">
+            <p className="mb-3">Galaxy Division هي لعبة سفينة فضاء متعددة اللاعبين عبر الإنترنت حيث يمكنك الاستمتاع بمعارك مكثفة بين النجوم في أوضاع لعب مختلفة في الوقت الفعلي ومهام غير متصلة بالإنترنت.</p>
+            
+            <h6 className="text-white font-bold mb-1">سفن الفضاء:</h6>
+            <p className="mb-3">أكثر من 30 سفينة فضاء قتالية، مقسمة إلى ثلاث رتب (برونزية، فضية، ذهبية)، قابلة للتعزيز حتى 6 نجوم.</p>
 
-            {/* Spec item 2 */}
-            <div className="flex items-start gap-3 p-3 bg-slate-950/70 rounded-xl border border-slate-900">
-              <div className="w-1.5 h-1.5 bg-[#00f3ff] rounded-full mt-1.5"></div>
-              <div>
-                <h5 className="text-xs font-black text-white">الهندسة الصوتية التخليقية (Procedural Audio Synth)</h5>
-                <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                  تم الاستغناء كلياً عن تحميل الملفات الصوتية الكبيرة والاعتماد على تخليق الترددات الحماسية والتحذيرية برمجياً عبر Web Audio API لزيادة سرعة استجابة المحاكي.
-                </p>
-              </div>
-            </div>
+            <h6 className="text-white font-bold mb-1">الترسانة:</h6>
+            <p className="mb-3">تخصيص السفن بترسانة واسعة من الأسلحة (مدافع رشاشة، أنظمة دفاع، قدرات خاصة) وتخصيص الألوان.</p>
 
-            {/* Spec item 3 */}
-            <div className="flex items-start gap-3 p-3 bg-slate-950/70 rounded-xl border border-slate-900">
-              <div className="w-1.5 h-1.5 bg-[#00f3ff] rounded-full mt-1.5"></div>
-              <div>
-                <h5 className="text-xs font-black text-white">البنية الرسومية ثلاثية الأبعاد (Adaptive 3D Context)</h5>
-                <p className="text-[10px] text-slate-400 leading-relaxed mt-0.5">
-                  مبنية على سياق Three.js ومزودة بمسارات تتبع ومحاكاة فيزيائية للطائرات والمحاربين، مع ملاءمة ديناميكية ومسح حراري تكتيكي (FLIR) في المشاهد السينمائية.
-                </p>
-              </div>
-            </div>
+            <h6 className="text-white font-bold mb-1">المعارك:</h6>
+            <p className="mb-3">6 أوضاع قتال متعددة اللاعبين (معارك الفريق، استعادة المعلومات، القتال حتى الموت، إلخ) بالإضافة إلى مهام يومية.</p>
+
+            <h6 className="text-white font-bold mb-1">الميزات:</h6>
+            <ul className="list-disc list-inside mb-3">
+              <li>التعاون مع الأصدقاء وتكوين أساطيل.</li>
+              <li>رسومات ثلاثية الأبعاد مذهلة (LOW to ULTRA).</li>
+              <li>نظام ألقاب وإنجازات (أكثر من 30 عنواناً).</li>
+              <li>لا يتطلب الاتصال بالإنترنت (في أوضاع معينة).</li>
+            </ul>
+            
+            <p className="font-bold text-[#00f3ff]">حملها الآن وكن أسطورة في Starfleet!</p>
           </div>
         </div>
 
         {/* Warning text */}
         <div className="flex items-center gap-2 text-[10px] text-amber-500 font-bold bg-amber-500/5 p-3 rounded-xl border border-amber-500/10">
           <Info size={14} className="shrink-0" />
-          <span>هذا المحاكي مرخص بشكل سيادي وخاضع للتعديل المستمر لإضافة أنظمة الدفاع النشط.</span>
+          <span>هذه المحاكاة تخضع للتحديثات المستمرة لإضافة أنظمة القتال المتقدمة.</span>
         </div>
       </div>
     </div>

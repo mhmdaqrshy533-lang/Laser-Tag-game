@@ -1,6 +1,6 @@
 {
-  "name": "تنكيل",
-  "description": "Realistic 3D third-person tactical Battle Royale replica with multiplayer battlefield simulation on an Erangel runway.",
+  "name": "Galaxy Division",
+  "description": "High-octane third-person space shooter with deep upgrade systems, boss duels, and PvP arenas.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

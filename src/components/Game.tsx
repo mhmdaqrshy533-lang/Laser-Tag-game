@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 const AnyCanvas = Canvas as any;
 import { useGameStore } from '../store';
 import { useShallow } from 'zustand/react/shallow';
+import { useProgress } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { LoadingScreen } from './LoadingScreen';
+import { DebugOverlay } from './DebugOverlay';
 
 import { 
   SharedGameState, 
@@ -129,15 +132,36 @@ export function Game() {
   const gameState = useGameStore(state => state.gameState);
   const selectedStage = useGameStore(state => state.selectedStage);
   
+  const { progress, item, errors } = useProgress();
+  const [isTimedOut, setIsTimedOut] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (progress < 100) {
+        setIsTimedOut(true);
+      }
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [selectedStage]);
+
+  useEffect(() => {
+    if (errors.length > 0) {
+      setHasError(true);
+    }
+  }, [errors]);
+  
   // Create state based on the actual stage
   const stateRef = useRef<SharedGameState>(createInitialSharedState(useGameStore.getState().selectedStage));
   const [canvasKey, setCanvasKey] = useState(0);
 
   useEffect(() => {
     if (gameState === 'playing') {
+      setIsTimedOut(false);
+      setHasError(false);
       stateRef.current = createInitialSharedState(useGameStore.getState().selectedStage);
     }
-  }, [gameState, useGameStore.getState().selectedStage]);
+  }, [gameState, selectedStage]);
 
   const triggerReloadRef = useRef<() => void>(() => {});
   const shootRef = useRef<() => void>(() => {});
@@ -148,6 +172,8 @@ export function Game() {
 
   const isMouseDown = useRef(false);
   const prevMousePos = useRef({ x: 0, y: 0 });
+
+  const isLoading = progress < 100 && !isTimedOut && !hasError;
 
   return (
     <div 
@@ -165,7 +191,7 @@ export function Game() {
         let deltaY = e.clientY - prevMousePos.current.y;
         prevMousePos.current = { x: e.clientX, y: e.clientY };
         
-        const isForcedLandscape = window.innerHeight > window.innerWidth;
+        const isForcedLandscape = window.innerWidth < window.innerHeight;
         if (isForcedLandscape) {
           const tempX = deltaX;
           deltaX = deltaY;
@@ -181,51 +207,65 @@ export function Game() {
       onContextMenu={(e) => e.preventDefault()}
     >
       <CinematicOverlay />
+      {isLoading && (
+        <LoadingScreen 
+          progress={progress} 
+          item={item || undefined} 
+          error={isTimedOut ? "انتهت مهلة التحميل" : hasError ? "فشل تحميل بعض الموارد" : null} 
+        />
+      )}
       <WebGLBoundary onReset={handleCanvasReset}>
-        <AnyCanvas 
-          key={canvasKey}
-          shadows={!isMobile} 
-          camera={{ fov: 75, near: 0.1, far: 8000 }}
-          dpr={isMobile ? [1, 1.25] : [1, 2]}
-          gl={{ 
-            antialias: true, 
-            alpha: false, 
-            powerPreference: "high-performance",
-            preserveDrawingBuffer: false,
-            failIfMajorPerformanceCaveat: false
-          }}
-        >
-          <WebGLContextListener onContextLost={handleCanvasReset} />
-          
-          <GameLoop 
-            stateRef={stateRef} 
-            triggerReloadRef={triggerReloadRef} 
-            shootRef={shootRef} 
-          />
+        <Suspense fallback={null}>
+            <AnyCanvas 
+            key={canvasKey}
+            shadows={!isMobile} 
+            camera={{ fov: 75, near: 0.1, far: 8000 }}
+            dpr={isMobile ? 1 : [1, 2]}
+            gl={{ 
+                antialias: true, 
+                alpha: false, 
+                powerPreference: "high-performance",
+                preserveDrawingBuffer: false,
+                failIfMajorPerformanceCaveat: false
+            }}
+            >
+            <WebGLContextListener onContextLost={handleCanvasReset} />
+            
+            <DebugOverlay 
+              stateRef={stateRef}
+              isLoaded={!isLoading}
+            />
+            
+            <GameLoop 
+                stateRef={stateRef} 
+                triggerReloadRef={triggerReloadRef} 
+                shootRef={shootRef} 
+            />
 
-          {selectedStage === 'desert' ? (
-            <DesertVisual />
-          ) : (
-            <ArenaVisual />
-          )}
+            {selectedStage === 'desert' ? (
+                <DesertVisual />
+            ) : (
+                <ArenaVisual />
+            )}
 
-          <Lasers />
-          <ImpactParticles />
-          <ChronosEffect />
+            <Lasers />
+            <ImpactParticles />
+            <ChronosEffect />
 
-          <PlayerVisual stateRef={stateRef} />
-          
-          {/* We use an internal component to render enemies to avoid Game re-render loop on enemies array */}
-          <EnemiesRenderer stateRef={stateRef} />
-          <GeneratorsRenderer stateRef={stateRef} />
-          <OtherPlayersRenderer />
-          
-          {!isMobile && (
-            <EffectComposer>
-              <Bloom luminanceThreshold={0.5} luminanceSmoothing={0.9} height={300} />
-            </EffectComposer>
-          )}
-        </AnyCanvas>
+            <PlayerVisual stateRef={stateRef} />
+            
+            {/* We use an internal component to render enemies to avoid Game re-render loop on enemies array */}
+            <EnemiesRenderer stateRef={stateRef} />
+            <GeneratorsRenderer stateRef={stateRef} />
+            <OtherPlayersRenderer />
+            
+            {!isMobile && (
+                <EffectComposer>
+                <Bloom luminanceThreshold={0.5} luminanceSmoothing={0.9} height={300} />
+                </EffectComposer>
+            )}
+            </AnyCanvas>
+        </Suspense>
       </WebGLBoundary>
     </div>
   );

@@ -14,8 +14,8 @@ export function StealthHUD() {
            <div className="w-[2px] h-10 bg-amber-500/80 absolute"></div>
            
            <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/40 px-4 py-1 rounded border border-amber-500/50 backdrop-blur-sm text-center">
-             <div className="text-xl font-bold font-sans">تَنكِيل SGMW</div>
-             <div className="text-[10px] uppercase tracking-widest text-amber-300">Strategic Stealth Platform // S3T-01</div>
+             <div className="text-xl font-bold font-sans">Galaxy Division</div>
+             <div className="text-[10px] uppercase tracking-widest text-amber-300">Interstellar Combat System // GD-01</div>
            </div>
         </div>
       </div>

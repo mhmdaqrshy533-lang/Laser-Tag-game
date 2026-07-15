@@ -1172,23 +1172,28 @@ export function PlayerVisual({ stateRef }: { stateRef: React.MutableRefObject<Sh
       <group ref={meshRef}>
         <group ref={bodyGroupRef}>
              <group ref={planeGroupRef}>
-               {/* Stealth Plane Flying Wing design */}
-               <mesh castShadow rotation={[0, Math.PI, 0]}>
-                  {/* Flattened triangle/wing shape */}
-                  <coneGeometry args={[12, 18, 3, 1, false, 0, Math.PI]} />
-                  <meshStandardMaterial color="#1e293b" metalness={0.8} roughness={0.2} />
-                  <Text position={[-3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1" font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfMZhrib2Bg-4.ttf">
-                    TANKEEL
-                  </Text>
-                  <Text position={[3, 0.5, -4]} rotation={[-Math.PI / 2, 0, Math.PI]} fontSize={1.5} color="#cbd5e1">
-                    تَنكِيل
-                  </Text>
-               </mesh>
-               {/* Cockpit canopy */}
-               <mesh position={[0, 1.5, 2]} rotation={[0, Math.PI, 0]}>
-                 <boxGeometry args={[3, 1, 6]} />
-                 <meshStandardMaterial color="#000000" metalness={1.0} roughness={0.0} />
-               </mesh>
+               {/* Stealth Plane Flying Wing design - More Detailed */}
+               <group rotation={[0, Math.PI, 0]}>
+                   {/* Main body */}
+                   <mesh castShadow>
+                     <boxGeometry args={[25, 1, 15]} />
+                     <meshStandardMaterial color="#1e293b" metalness={0.9} roughness={0.1} />
+                   </mesh>
+                   {/* Wings */}
+                   <mesh castShadow position={[0, 0, -5]}>
+                     <coneGeometry args={[15, 8, 3, 1]} />
+                     <meshStandardMaterial color="#0f172a" metalness={0.8} roughness={0.2} />
+                   </mesh>
+                   {/* Cockpit canopy */}
+                   <mesh position={[0, 1.0, 2]} castShadow>
+                     <boxGeometry args={[4, 1.5, 6]} />
+                     <meshStandardMaterial color="#000000" metalness={1.0} roughness={0.0} />
+                   </mesh>
+                   
+                   <Text position={[-3, 1.5, -4]} rotation={[0, Math.PI, 0]} fontSize={1.5} color="#cbd5e1">
+                     TANKEEL
+                   </Text>
+               </group>
              </group>
              <group ref={soldierGroupRef}>
                <VisualSoldierMesh 
@@ -1542,38 +1547,52 @@ export function DesertVisual() {
 
   return (
     <group>
-      <color attach="background" args={['#d97706']} />
-      <Sky sunPosition={[500, 50, -1000]} turbidity={0.6} rayleigh={2} mieCoefficient={0.005} mieDirectionalG={0.8} />
-      <ambientLight intensity={0.2} color="#fca5a5" />
-      <directionalLight position={[500, 50, -1000]} intensity={1.5} color="#fb923c" castShadow />
-      <fog attach="fog" args={['#d97706', 500, 5000]} />
+      <color attach="background" args={['#2a1f12']} />
+      <Sky sunPosition={[100, 20, 100]} turbidity={0.5} rayleigh={0.5} mieCoefficient={0.005} mieDirectionalG={0.8} />
+      
+      <ambientLight intensity={0.6} color="#fcd34d" />
+      <directionalLight 
+        position={[200, 500, 200]} 
+        intensity={2.0} 
+        color="#fbbf24" 
+        castShadow
+        shadow-mapSize={[4096, 4096]}
+        shadow-camera-left={-10000}
+        shadow-camera-right={10000}
+        shadow-camera-top={10000}
+        shadow-camera-bottom={-10000}
+      />
+      
+      <fog attach="fog" args={['#2a1f12', 500, 15000]} />
       
       {/* Massive Desert Ground */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0,-100,0]}>
-        <planeGeometry args={[20000, 20000]} />
-        <meshStandardMaterial color="#92400e" roughness={0.9} metalness={0.1} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0,-150,0]}>
+        <planeGeometry args={[40000, 40000, 128, 128]} />
+        <meshStandardMaterial color="#b45309" roughness={0.95} metalness={0.05} />
       </mesh>
 
       {/* Procedural Mountains/Hills */}
-      {Array.from({ length: 20 }).map((_, i) => (
+      {Array.from({ length: 40 }).map((_, i) => (
          <mesh 
            key={`mtn-${i}`}
-           position={[Math.sin(i * 123) * 5000, -80, Math.cos(i * 456) * 5000]} 
+           position={[Math.sin(i * 123) * 8000, -150, Math.cos(i * 456) * 8000]} 
            rotation={[0, i, 0]}
+           castShadow
          >
-           <coneGeometry args={[1000 + Math.random() * 500, 1500 + Math.random() * 1000, 4]} />
-           <meshStandardMaterial color="#78350f" />
+           <coneGeometry args={[2000 + Math.random() * 2000, 3000 + Math.random() * 2000, 3]} />
+           <meshStandardMaterial color="#92400e" roughness={0.9} />
          </mesh>
       ))}
 
       {/* Scattered Rocks */}
-      {Array.from({ length: 100 }).map((_, i) => (
+      {Array.from({ length: 300 }).map((_, i) => (
          <mesh 
            key={`rock-${i}`}
-           position={[Math.sin(i * 99) * 3000, -95, Math.cos(i * 88) * 3000]} 
+           position={[Math.sin(i * 99) * 5000, -145, Math.cos(i * 88) * 5000]} 
+           castShadow
          >
-           <dodecahedronGeometry args={[50 + Math.random() * 100]} />
-           <meshStandardMaterial color="#57534e" />
+           <dodecahedronGeometry args={[50 + Math.random() * 200]} />
+           <meshStandardMaterial color="#57534e" roughness={0.8} />
          </mesh>
       ))}
     </group>
